@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Должна совпадать с Godot.NET.Sdk в DirgeOfWithering.csproj
+  GODOT_VERSION: "4.7.1"
+
+jobs:
+  # Быстрая проверка: SDK + GodotSharp с nuget.org, без редактора.
+  csharp-build:
+    name: C# build (${{ matrix.configuration }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: DirgeOfWithering.csproj
+
+      - name: Restore
+        run: dotnet restore DirgeOfWithering.csproj
+
+      - name: Build
+        run: dotnet build DirgeOfWithering.csproj -c ${{ matrix.configuration }} --no-restore
+
+  # Импорт проекта Godot .NET + сборка solutions (ловит поломанные .tscn / скрипты).
+  godot-validate:
+    name: Godot validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: csharp-build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: DirgeOfWithering.csproj
+
+      - name: Install xvfb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+
+      - name: Setup Godot (.NET)
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: true
+          include-templates: false
+
+      - name: Import project
+        run: godot --headless --path "$GITHUB_WORKSPACE" --import
+
+      - name: Build C# solutions
+        run: |
+          # --build-solutions идёт через editor-путь; на headless CI нужен виртуальный дисплей.
+          xvfb-run -a godot --path "$GITHUB_WORKSPACE" --build-solutions --quit
+
+      - name: Verify assembly
+        run: |
+          set -euo pipefail
+          dll="$(find .godot -name 'DirgeOfWithering.dll' -print -quit)"
+          if [[ -z "${dll}" ]]; then
+            echo "::error::DirgeOfWithering.dll not found under .godot/"
+            find .godot -type f -name '*.dll' -print || true
+            exit 1
+          fi
+          echo "Found: ${dll}"
+          ls -lah "${dll}"

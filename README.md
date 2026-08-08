@@ -144,6 +144,18 @@ BasicEnemy (CharacterBody3D)
 - Не вызывать `AddChild` на родителе из `_Ready` ребёнка во время setup — использовать `CallDeferred` (см. `EnemySpawner`).
 - Экспорт тюнинга боя через `[Export]` на компонентах (`WindupTime`, `KnockbackForce`, …).
 
+## CI (GitHub Actions)
+
+Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+| Job | Что делает |
+|-----|------------|
+| `csharp-build` | `dotnet restore/build` Debug + Release через `Godot.NET.Sdk` (без редактора) |
+| `godot-validate` | Godot 4.7.1 .NET: `--import` → `--build-solutions` → проверка `DirgeOfWithering.dll` |
+
+Триггеры: `push` / `pull_request` в `master`|`main`, плюс `workflow_dispatch`.  
+Версию Godot в CI держим синхронно с `Godot.NET.Sdk` в `.csproj`.
+
 ## Документация
 
 - [CONCEPT.md](CONCEPT.md) — сеттинг, герой, Скверна, живое оружие, метроидвания, моральные развилки.
