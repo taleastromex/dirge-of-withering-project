@@ -3,16 +3,12 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Прототипный HUD: HP игрока и ближайшего/назначенного врага.
-/// Не финальный UI.
+/// Прототипный HUD: HP игрока и текущего врага из группы enemies.
 /// </summary>
 public partial class DebugHud : CanvasLayer
 {
 	[Export]
 	public NodePath PlayerPath { get; set; } = new("../Player");
-
-	[Export]
-	public NodePath EnemyPath { get; set; } = new("../BasicEnemy");
 
 	private Label? _label;
 	private Health? _playerHealth;
@@ -36,12 +32,12 @@ public partial class DebugHud : CanvasLayer
 	{
 		if (_playerHealth == null || !GodotObject.IsInstanceValid(_playerHealth))
 		{
-			ResolveTargets();
+			ResolvePlayer();
 		}
 
 		if (_enemyHealth == null || !GodotObject.IsInstanceValid(_enemyHealth))
 		{
-			TryResolveEnemy();
+			ResolveEnemy();
 		}
 
 		string playerText = _playerHealth != null
@@ -50,32 +46,31 @@ public partial class DebugHud : CanvasLayer
 
 		string enemyText = _enemyHealth != null && GodotObject.IsInstanceValid(_enemyHealth)
 			? $"Enemy HP: {_enemyHealth.Current}/{_enemyHealth.MaxHealth}"
-			: "Enemy HP: dead";
+			: "Enemy HP: respawning…";
+
+		string iframe = _playerHealth != null && _playerHealth.IsInvulnerable ? " [i-frames]" : "";
 
 		if (_label != null)
 		{
-			_label.Text = $"{playerText}\n{enemyText}\nLMB — attack";
+			_label.Text = $"{playerText}{iframe}\n{enemyText}\nLMB — attack";
 		}
 	}
 
 	private void ResolveTargets()
 	{
-		Node? player = GetNodeOrNull(PlayerPath);
-		_playerHealth = player?.GetNodeOrNull<Health>("Health");
-
-		TryResolveEnemy();
+		ResolvePlayer();
+		ResolveEnemy();
 	}
 
-	private void TryResolveEnemy()
+	private void ResolvePlayer()
 	{
-		Node? enemy = GetNodeOrNull(EnemyPath);
-		if (enemy != null && GodotObject.IsInstanceValid(enemy))
-		{
-			_enemyHealth = enemy.GetNodeOrNull<Health>("Health");
-			return;
-		}
+		Node? player = GetNodeOrNull(PlayerPath) ?? GetTree().GetFirstNodeInGroup("player");
+		_playerHealth = player?.GetNodeOrNull<Health>("Health");
+	}
 
-		Node? fallback = GetTree().GetFirstNodeInGroup("enemies");
-		_enemyHealth = fallback?.GetNodeOrNull<Health>("Health");
+	private void ResolveEnemy()
+	{
+		Node? enemy = GetTree().GetFirstNodeInGroup("enemies");
+		_enemyHealth = enemy?.GetNodeOrNull<Health>("Health");
 	}
 }

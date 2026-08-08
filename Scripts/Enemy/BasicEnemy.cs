@@ -3,8 +3,8 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Примитивный враг Core Loop: детект → подход по прямой → телеграф → удар.
-/// Без NavMesh.
+/// Примитивный враг Core Loop: детект → подход → телеграф → удар.
+/// Есть stagger от урона и knockback.
 /// </summary>
 public partial class BasicEnemy : CharacterBody3D
 {
@@ -15,29 +15,45 @@ public partial class BasicEnemy : CharacterBody3D
 		Telegraph,
 		Attack,
 		Recovery,
+		Stagger,
 		Dead
 	}
 
 	[Export]
-	public float MoveSpeed { get; set; } = 3.5f;
+	public float MoveSpeed { get; set; } = 3.35f;
 
 	[Export]
 	public float DetectRange { get; set; } = 12f;
 
 	[Export]
-	public float AttackRange { get; set; } = 1.6f;
+	public float AttackRange { get; set; } = 1.55f;
 
 	[Export]
-	public float TelegraphTime { get; set; } = 0.4f;
+	public float TelegraphTime { get; set; } = 0.45f;
 
 	[Export]
-	public float AttackActiveTime { get; set; } = 0.15f;
+	public float AttackActiveTime { get; set; } = 0.14f;
 
 	[Export]
-	public float RecoveryTime { get; set; } = 0.55f;
+	public float RecoveryTime { get; set; } = 0.6f;
+
+	[Export]
+	public float StaggerTime { get; set; } = 0.28f;
 
 	[Export]
 	public int AttackDamage { get; set; } = 20;
+
+	[Export]
+	public float AttackKnockback { get; set; } = 7f;
+
+	[Export]
+	public float AttackHitStop { get; set; } = 0.045f;
+
+	[Export]
+	public float KnockbackDuration { get; set; } = 0.14f;
+
+	[Export]
+	public float DeathDespawnDelay { get; set; } = 0.55f;
 
 	[Export]
 	public Health? Health { get; set; }
@@ -57,6 +73,10 @@ public partial class BasicEnemy : CharacterBody3D
 	private StandardMaterial3D? _bodyMaterial;
 	private Color _baseColor = new(0.35f, 0.4f, 0.28f, 1f);
 	private Color _telegraphColor = new(0.85f, 0.25f, 0.15f, 1f);
+	private Color _staggerColor = new(0.75f, 0.7f, 0.45f, 1f);
+
+	private Vector3 _knockbackVelocity;
+	private float _knockbackTimer;
 
 	public override void _Ready()
 	{
@@ -70,7 +90,7 @@ public partial class BasicEnemy : CharacterBody3D
 		if (Hitbox != null)
 		{
 			Hitbox.OwnerRoot = this;
-			Hitbox.Damage = AttackDamage;
+			ApplyHitboxTuning();
 			Hitbox.SetActive(false);
 		}
 
@@ -88,6 +108,7 @@ public partial class BasicEnemy : CharacterBody3D
 		if (Health != null)
 		{
 			Health.Died += OnDied;
+			Health.Damaged += OnDamaged;
 		}
 
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
@@ -102,6 +123,26 @@ public partial class BasicEnemy : CharacterBody3D
 
 		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
 		float dt = (float)delta;
+
+		if (_knockbackTimer > 0f)
+		{
+			_knockbackTimer -= dt;
+			Velocity = new Vector3(_knockbackVelocity.X, Velocity.Y, _knockbackVelocity.Z);
+			_knockbackVelocity = _knockbackVelocity.MoveToward(Vector3.Zero, 35f * dt);
+			MoveAndSlide();
+
+			if (_state == AiState.Stagger)
+			{
+				_stateTimer -= dt;
+				if (_stateTimer <= 0f && _knockbackTimer <= 0f)
+				{
+					SetBodyColor(_baseColor);
+					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
+				}
+			}
+
+			return;
+		}
 
 		switch (_state)
 		{
@@ -164,9 +205,37 @@ public partial class BasicEnemy : CharacterBody3D
 					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
 				}
 				break;
+
+			case AiState.Stagger:
+				Velocity = new Vector3(0f, Velocity.Y, 0f);
+				_stateTimer -= dt;
+				if (_stateTimer <= 0f)
+				{
+					SetBodyColor(_baseColor);
+					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
+				}
+				break;
 		}
 
 		MoveAndSlide();
+	}
+
+	public void ApplyKnockback(Vector3 sourcePosition, float force)
+	{
+		if (_state == AiState.Dead || force <= 0f)
+		{
+			return;
+		}
+
+		Vector3 dir = GlobalPosition - sourcePosition;
+		dir.Y = 0f;
+		if (dir.LengthSquared() < 0.0001f)
+		{
+			dir = Vector3.Forward;
+		}
+
+		_knockbackVelocity = dir.Normalized() * force;
+		_knockbackTimer = KnockbackDuration;
 	}
 
 	private void BeginTelegraph()
@@ -184,12 +253,8 @@ public partial class BasicEnemy : CharacterBody3D
 		_state = AiState.Attack;
 		_stateTimer = AttackActiveTime;
 		FacePlayer();
-
-		if (Hitbox != null)
-		{
-			Hitbox.Damage = AttackDamage;
-			Hitbox.SetActive(true);
-		}
+		ApplyHitboxTuning();
+		Hitbox?.SetActive(true);
 	}
 
 	private void BeginRecovery()
@@ -197,6 +262,14 @@ public partial class BasicEnemy : CharacterBody3D
 		_state = AiState.Recovery;
 		_stateTimer = RecoveryTime;
 		Hitbox?.SetActive(false);
+	}
+
+	private void BeginStagger()
+	{
+		_state = AiState.Stagger;
+		_stateTimer = StaggerTime;
+		Hitbox?.SetActive(false);
+		SetBodyColor(_staggerColor);
 	}
 
 	private void ChasePlayer()
@@ -286,10 +359,34 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 	}
 
+	private void ApplyHitboxTuning()
+	{
+		if (Hitbox == null)
+		{
+			return;
+		}
+
+		Hitbox.Damage = AttackDamage;
+		Hitbox.KnockbackForce = AttackKnockback;
+		Hitbox.HitStopSeconds = AttackHitStop;
+	}
+
+	private void OnDamaged(int amount, Vector3 sourcePosition)
+	{
+		if (_state == AiState.Dead)
+		{
+			return;
+		}
+
+		// Прерываем телеграф/удар — читаемый ответ на попадание.
+		BeginStagger();
+	}
+
 	private void OnDied()
 	{
 		_state = AiState.Dead;
 		Velocity = Vector3.Zero;
+		_knockbackTimer = 0f;
 		Hitbox?.SetActive(false);
 		SetBodyColor(new Color(0.15f, 0.12f, 0.12f, 1f));
 
@@ -301,7 +398,6 @@ public partial class BasicEnemy : CharacterBody3D
 			Visual.Visible = false;
 		}
 
-		// Короткая пауза, затем удаление — удобно для Core Loop.
-		GetTree().CreateTimer(0.8f).Timeout += QueueFree;
+		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
 	}
 }

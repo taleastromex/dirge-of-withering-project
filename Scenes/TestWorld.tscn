@@ -1,9 +1,10 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="PackedScene" path="res://Scenes/Player/Player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://Scripts/Camera/FollowCamera.cs" id="2_camera"]
 [ext_resource type="PackedScene" path="res://Scenes/Enemy/BasicEnemy.tscn" id="3_enemy"]
 [ext_resource type="Script" path="res://Scripts/UI/DebugHud.cs" id="4_hud"]
+[ext_resource type="Script" path="res://Scripts/Enemy/EnemySpawner.cs" id="5_spawner"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_floor"]
 albedo_color = Color(0.14, 0.13, 0.15, 1)
@@ -105,8 +106,11 @@ shape = SubResource("BoxShape_block")
 [node name="Player" parent="." instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 
-[node name="BasicEnemy" parent="." instance=ExtResource("3_enemy")]
+[node name="EnemySpawner" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+script = ExtResource("5_spawner")
+EnemyScene = ExtResource("3_enemy")
+RespawnDelay = 2.5
 
 [node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("Target")]
 script = ExtResource("2_camera")
@@ -124,4 +128,4 @@ far = 200.0
 [node name="DebugHud" type="CanvasLayer" parent="."]
 script = ExtResource("4_hud")
 PlayerPath = NodePath("../Player")
-EnemyPath = NodePath("../BasicEnemy")
+EnemyPath = NodePath("")

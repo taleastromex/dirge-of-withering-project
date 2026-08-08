@@ -12,6 +12,12 @@ public partial class Hitbox3D : Area3D
 	[Export]
 	public int Damage { get; set; } = 25;
 
+	[Export]
+	public float KnockbackForce { get; set; } = 8f;
+
+	[Export]
+	public float HitStopSeconds { get; set; } = 0.05f;
+
 	/// <summary>Корень владельца — его Health не повреждается.</summary>
 	[Export]
 	public Node? OwnerRoot { get; set; }
@@ -48,7 +54,6 @@ public partial class Hitbox3D : Area3D
 			return;
 		}
 
-		// Тела, уже находящиеся внутри области в момент включения.
 		foreach (Node3D body in GetOverlappingBodies())
 		{
 			TryHit(body);
@@ -84,7 +89,37 @@ public partial class Hitbox3D : Area3D
 			return;
 		}
 
-		health.TakeDamage(Damage);
+		Vector3 source = OwnerRoot is Node3D owner3D ? owner3D.GlobalPosition : GlobalPosition;
+		bool landed = health.TakeDamage(Damage, source);
+		if (!landed)
+		{
+			return;
+		}
+
+		ApplyKnockback(body, source);
+
+		if (HitStopSeconds > 0f)
+		{
+			CombatHitStop.Pulse(GetTree(), HitStopSeconds);
+		}
+	}
+
+	private void ApplyKnockback(Node3D body, Vector3 source)
+	{
+		if (KnockbackForce <= 0f)
+		{
+			return;
+		}
+
+		switch (body)
+		{
+			case Player player:
+				player.ApplyKnockback(source, KnockbackForce);
+				break;
+			case BasicEnemy enemy:
+				enemy.ApplyKnockback(source, KnockbackForce);
+				break;
+		}
 	}
 
 	private static Health? FindHealth(Node node)

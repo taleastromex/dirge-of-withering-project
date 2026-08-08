@@ -22,32 +22,37 @@ public partial class PlayerAttack : Node
 	public Health? Health { get; set; }
 
 	[Export]
-	public float WindupTime { get; set; } = 0.08f;
+	public float WindupTime { get; set; } = 0.1f;
 
 	[Export]
-	public float ActiveTime { get; set; } = 0.14f;
+	public float ActiveTime { get; set; } = 0.12f;
 
 	[Export]
-	public float CooldownTime { get; set; } = 0.35f;
+	public float CooldownTime { get; set; } = 0.42f;
 
 	[Export]
-	public int Damage { get; set; } = 25;
+	public int Damage { get; set; } = 28;
+
+	[Export]
+	public float KnockbackForce { get; set; } = 9f;
+
+	[Export]
+	public float HitStopSeconds { get; set; } = 0.055f;
 
 	private AttackPhase _phase = AttackPhase.Idle;
 	private float _phaseTimer;
 
 	public bool IsAttacking => _phase is AttackPhase.Windup or AttackPhase.Active;
 
+	/// <summary>Во время замаха и active frames движение режется.</summary>
+	public bool LocksMovement => _phase is AttackPhase.Windup or AttackPhase.Active;
+
 	public override void _Ready()
 	{
 		Hitbox ??= GetNodeOrNull<Hitbox3D>("../Visual/Hitbox");
 		Health ??= GetNodeOrNull<Health>("../Health");
-
-		if (Hitbox != null)
-		{
-			Hitbox.Damage = Damage;
-			Hitbox.SetActive(false);
-		}
+		ApplyHitboxTuning();
+		Hitbox?.SetActive(false);
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -106,12 +111,8 @@ public partial class PlayerAttack : Node
 	{
 		_phase = AttackPhase.Active;
 		_phaseTimer = ActiveTime;
-
-		if (Hitbox != null)
-		{
-			Hitbox.Damage = Damage;
-			Hitbox.SetActive(true);
-		}
+		ApplyHitboxTuning();
+		Hitbox?.SetActive(true);
 	}
 
 	private void BeginCooldown()
@@ -126,5 +127,17 @@ public partial class PlayerAttack : Node
 		_phase = AttackPhase.Idle;
 		_phaseTimer = 0f;
 		Hitbox?.SetActive(false);
+	}
+
+	private void ApplyHitboxTuning()
+	{
+		if (Hitbox == null)
+		{
+			return;
+		}
+
+		Hitbox.Damage = Damage;
+		Hitbox.KnockbackForce = KnockbackForce;
+		Hitbox.HitStopSeconds = HitStopSeconds;
 	}
 }

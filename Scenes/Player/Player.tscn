@@ -45,12 +45,18 @@ script = ExtResource("1_player")
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
 MaxHealth = 100
+InvulnerabilityDuration = 0.5
 
 [node name="PlayerAttack" type="Node" parent="." node_paths=PackedStringArray("Hitbox", "Health")]
 script = ExtResource("3_attack")
 Hitbox = NodePath("../Visual/Hitbox")
 Health = NodePath("../Health")
-Damage = 25
+WindupTime = 0.1
+ActiveTime = 0.12
+CooldownTime = 0.42
+Damage = 28
+KnockbackForce = 9.0
+HitStopSeconds = 0.055
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
@@ -75,7 +81,9 @@ collision_mask = 4
 monitorable = false
 monitoring = false
 script = ExtResource("4_hitbox")
-Damage = 25
+Damage = 28
+KnockbackForce = 9.0
+HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")
 DebugMesh = NodePath("DebugMesh")
 
