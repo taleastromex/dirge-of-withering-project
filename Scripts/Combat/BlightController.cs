@@ -27,6 +27,14 @@ public partial class BlightController : Node
 	[Export]
 	public float OverloadDrainPerSecond { get; set; } = 14f;
 
+	/// <summary>Пассивный спад Скверны вне перегрузки (ед/сек).</summary>
+	[Export]
+	public float PassiveDecayPerSecond { get; set; } = 5f;
+
+	/// <summary>Пауза после набора Скверны, прежде чем начнётся спад.</summary>
+	[Export]
+	public float DecayDelayAfterGain { get; set; } = 1.35f;
+
 	[Export]
 	public Color OverloadTint { get; set; } = new(0.45f, 0.08f, 0.1f);
 
@@ -36,6 +44,7 @@ public partial class BlightController : Node
 	private float _baseAmbientEnergy;
 	private Color _baseBackground;
 	private float _drainAccumulator;
+	private float _decayDelayTimer;
 	private bool _tintActive;
 	private bool _environmentCached;
 
@@ -74,29 +83,22 @@ public partial class BlightController : Node
 			return;
 		}
 
+		float dt = (float)delta;
 		UpdateWorldTint();
-
-		if (!Blight.IsOverloaded || OverloadDrainPerSecond <= 0f)
-		{
-			_drainAccumulator = 0f;
-			return;
-		}
-
-		_drainAccumulator += OverloadDrainPerSecond * (float)delta;
-		int drain = Mathf.FloorToInt(_drainAccumulator);
-		if (drain <= 0)
-		{
-			return;
-		}
-
-		_drainAccumulator -= drain;
-		Health.ApplyDrain(drain);
+		ApplyPassiveDecay(dt);
+		ApplyOverloadDrain(dt);
 	}
 
 	/// <summary>Вызывать при старте тяжёлой атаки.</summary>
 	public void NotifyHeavyAttackUsed()
 	{
-		Blight?.Add(BlightPerHeavyAttack);
+		if (Blight == null)
+		{
+			return;
+		}
+
+		Blight.Add(BlightPerHeavyAttack);
+		_decayDelayTimer = DecayDelayAfterGain;
 	}
 
 	public float GetDamageMultiplier() => Blight?.DamageMultiplier ?? 1f;
@@ -105,7 +107,51 @@ public partial class BlightController : Node
 
 	private void OnDamaged(int amount, Vector3 sourcePosition)
 	{
-		Blight?.Add(amount * BlightPerDamageTaken);
+		if (Blight == null)
+		{
+			return;
+		}
+
+		Blight.Add(amount * BlightPerDamageTaken);
+		_decayDelayTimer = DecayDelayAfterGain;
+	}
+
+	private void ApplyPassiveDecay(float delta)
+	{
+		if (Blight == null || Blight.IsOverloaded || PassiveDecayPerSecond <= 0f)
+		{
+			return;
+		}
+
+		if (_decayDelayTimer > 0f)
+		{
+			_decayDelayTimer -= delta;
+			return;
+		}
+
+		if (Blight.Current > 0f)
+		{
+			Blight.Remove(PassiveDecayPerSecond * delta);
+		}
+	}
+
+	private void ApplyOverloadDrain(float delta)
+	{
+		if (Blight == null || Health == null || !Blight.IsOverloaded || OverloadDrainPerSecond <= 0f)
+		{
+			_drainAccumulator = 0f;
+			return;
+		}
+
+		_drainAccumulator += OverloadDrainPerSecond * delta;
+		int drain = Mathf.FloorToInt(_drainAccumulator);
+		if (drain <= 0)
+		{
+			return;
+		}
+
+		_drainAccumulator -= drain;
+		Health.ApplyDrain(drain);
 	}
 
 	private void OnOverloadStarted()

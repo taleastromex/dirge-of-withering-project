@@ -99,6 +99,16 @@ public partial class Blight : Node
 		SetBlight(Current + amount);
 	}
 
+	public void Remove(float amount)
+	{
+		if (amount <= 0f)
+		{
+			return;
+		}
+
+		SetBlight(Current - amount);
+	}
+
 	public void SetBlight(float value)
 	{
 		float previous = Current;

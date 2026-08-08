@@ -60,6 +60,12 @@ public partial class Hitbox3D : Area3D
 		}
 	}
 
+	/// <summary>Показать/скрыть debug-меш без включения урона (телеграф игрока).</summary>
+	public void SetDebugVisiblePublic(bool visible)
+	{
+		SetDebugVisible(visible);
+	}
+
 	private void OnBodyEntered(Node3D body)
 	{
 		if (!Monitoring)

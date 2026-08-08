@@ -55,6 +55,14 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public float DeathDespawnDelay { get; set; } = 0.55f;
 
+	/// <summary>Множитель скорости, если у игрока HIGH/OVERLOAD Скверна.</summary>
+	[Export]
+	public float HighBlightSpeedMul { get; set; } = 1.28f;
+
+	/// <summary>Множитель длительности телеграфа при HIGH Скверне игрока (&lt; 1 = быстрее).</summary>
+	[Export]
+	public float HighBlightTelegraphMul { get; set; } = 0.72f;
+
 	[Export]
 	public Health? Health { get; set; }
 
@@ -233,7 +241,8 @@ public partial class BasicEnemy : CharacterBody3D
 	private void BeginTelegraph()
 	{
 		_state = AiState.Telegraph;
-		_stateTimer = TelegraphTime;
+		float telegraphMul = PlayerHasHighBlight() ? HighBlightTelegraphMul : 1f;
+		_stateTimer = TelegraphTime * telegraphMul;
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		Hitbox?.SetActive(false);
 		SetBodyColor(_telegraphColor);
@@ -280,8 +289,20 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 
 		Vector3 dir = toPlayer.Normalized();
-		Velocity = new Vector3(dir.X * MoveSpeed, Velocity.Y, dir.Z * MoveSpeed);
+		float speed = MoveSpeed * (PlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
+		Velocity = new Vector3(dir.X * speed, Velocity.Y, dir.Z * speed);
 		FaceDirection(dir);
+	}
+
+	private bool PlayerHasHighBlight()
+	{
+		if (_player == null)
+		{
+			return false;
+		}
+
+		Blight? blight = _player.GetNodeOrNull<Blight>("Blight");
+		return blight != null && blight.IsHigh;
 	}
 
 	private void FacePlayer()
