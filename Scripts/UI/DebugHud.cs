@@ -3,7 +3,7 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Прототипный HUD: HP игрока и текущего врага из группы enemies.
+/// Прототипный HUD: HP, Скверна, враг.
 /// </summary>
 public partial class DebugHud : CanvasLayer
 {
@@ -12,6 +12,7 @@ public partial class DebugHud : CanvasLayer
 
 	private Label? _label;
 	private Health? _playerHealth;
+	private Blight? _playerBlight;
 	private Health? _enemyHealth;
 
 	public override void _Ready()
@@ -44,6 +45,17 @@ public partial class DebugHud : CanvasLayer
 			? $"Player HP: {_playerHealth.Current}/{_playerHealth.MaxHealth}"
 			: "Player HP: —";
 
+		string blightText = "Blight: —";
+		if (_playerBlight != null && GodotObject.IsInstanceValid(_playerBlight))
+		{
+			string state = _playerBlight.IsOverloaded
+				? " OVERLOAD"
+				: _playerBlight.IsHigh
+					? " HIGH"
+					: "";
+			blightText = $"Blight: {_playerBlight.Current:0}/{_playerBlight.MaxBlight:0}{state}";
+		}
+
 		string enemyText = _enemyHealth != null && GodotObject.IsInstanceValid(_enemyHealth)
 			? $"Enemy HP: {_enemyHealth.Current}/{_enemyHealth.MaxHealth}"
 			: "Enemy HP: respawning…";
@@ -52,7 +64,8 @@ public partial class DebugHud : CanvasLayer
 
 		if (_label != null)
 		{
-			_label.Text = $"{playerText}{iframe}\n{enemyText}\nLMB — attack";
+			_label.Text =
+				$"{playerText}{iframe}\n{blightText}\n{enemyText}\nLMB — attack | RMB — heavy (+blight)";
 		}
 	}
 
@@ -66,6 +79,7 @@ public partial class DebugHud : CanvasLayer
 	{
 		Node? player = GetNodeOrNull(PlayerPath) ?? GetTree().GetFirstNodeInGroup("player");
 		_playerHealth = player?.GetNodeOrNull<Health>("Health");
+		_playerBlight = player?.GetNodeOrNull<Blight>("Blight");
 	}
 
 	private void ResolveEnemy()

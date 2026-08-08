@@ -54,18 +54,45 @@ public partial class Health : Node
 			return false;
 		}
 
+		ApplyHpLoss(amount, grantIframes: true, sourcePosition);
+		return true;
+	}
+
+	/// <summary>
+	/// Урон без i-frames (перегрузка Скверны и т.п.).
+	/// Не эмитит Damaged — чтобы не крутить набор Скверны от drain.
+	/// </summary>
+	public bool ApplyDrain(int amount)
+	{
+		if (IsDead || amount <= 0)
+		{
+			return false;
+		}
+
+		ApplyHpLoss(amount, grantIframes: false, sourcePosition: default, emitDamaged: false);
+		return true;
+	}
+
+	private void ApplyHpLoss(int amount, bool grantIframes, Vector3 sourcePosition, bool emitDamaged = true)
+	{
 		Current = Mathf.Max(0, Current - amount);
-		_iframeTimer = InvulnerabilityDuration;
+
+		if (grantIframes)
+		{
+			_iframeTimer = InvulnerabilityDuration;
+		}
 
 		EmitSignal(SignalName.HealthChanged, Current, MaxHealth);
-		EmitSignal(SignalName.Damaged, amount, sourcePosition);
+
+		if (emitDamaged)
+		{
+			EmitSignal(SignalName.Damaged, amount, sourcePosition);
+		}
 
 		if (Current <= 0)
 		{
 			EmitSignal(SignalName.Died);
 		}
-
-		return true;
 	}
 
 	public void HealFull()
