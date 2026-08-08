@@ -17,17 +17,22 @@ public partial class Player : CharacterBody3D
 	[Export]
 	public Node3D? AimPivot { get; set; }
 
+	/// <summary>Мёртвая зона курсора вокруг персонажа на экране (px).</summary>
 	[Export]
-	public float AimRayLength { get; set; } = 1000f;
+	public float AimScreenDeadzonePixels { get; set; } = 8f;
 
+	/// <summary>Высота точки персонажа для Unproject (экранный «центр» тела).</summary>
 	[Export]
-	public float AimPlaneY { get; set; } = 0f;
+	public float AimScreenPivotHeight { get; set; } = 0.9f;
 
 	[Export]
 	public Health? Health { get; set; }
 
 	[Export]
 	public PlayerAttack? Attack { get; set; }
+
+	[Export]
+	public BlightController? BlightController { get; set; }
 
 	[Export]
 	public MeshInstance3D? BodyMesh { get; set; }
@@ -67,6 +72,7 @@ public partial class Player : CharacterBody3D
 		AimPivot ??= GetNodeOrNull<Node3D>("Visual") ?? this;
 		Health ??= GetNodeOrNull<Health>("Health");
 		Attack ??= GetNodeOrNull<PlayerAttack>("PlayerAttack");
+		BlightController ??= GetNodeOrNull<BlightController>("BlightController");
 		BodyMesh ??= GetNodeOrNull<MeshInstance3D>("Visual/Body");
 		_camera = GetViewport().GetCamera3D();
 
@@ -173,7 +179,7 @@ public partial class Player : CharacterBody3D
 			"move_down"
 		);
 
-		float speed = MoveSpeed;
+		float speed = MoveSpeed * (BlightController?.GetSpeedMultiplier() ?? 1f);
 		if (Attack != null && Attack.LocksMovement)
 		{
 			speed *= AttackMoveMultiplier;
@@ -215,6 +221,11 @@ public partial class Player : CharacterBody3D
 		return direction.LengthSquared() > 0.0001f ? direction.Normalized() : Vector3.Zero;
 	}
 
+	/// <summary>
+	/// Прицел в экранном пространстве относительно персонажа (не raycast в пол).
+	/// Курсор «выше» тела на экране = вглубь сцены; «ниже» = к камере.
+	/// Так угол камеры больше не ломает ощущение вперёд/назад.
+	/// </summary>
 	private void HandleAiming()
 	{
 		if (_camera == null)
@@ -222,62 +233,63 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
+		Vector3 pivotWorld = GlobalPosition + Vector3.Up * AimScreenPivotHeight;
+		Vector2 playerScreen = _camera.UnprojectPosition(pivotWorld);
 		Vector2 mousePos = GetViewport().GetMousePosition();
-		Vector3 rayOrigin = _camera.ProjectRayOrigin(mousePos);
-		Vector3 rayDir = _camera.ProjectRayNormal(mousePos);
+		Vector2 screenDelta = mousePos - playerScreen;
 
-		Vector3? hitPoint = RaycastAimPoint(rayOrigin, rayDir)
-			?? IntersectAimPlane(rayOrigin, rayDir);
-
-		if (hitPoint == null)
+		if (screenDelta.LengthSquared() < AimScreenDeadzonePixels * AimScreenDeadzonePixels)
 		{
 			return;
 		}
+
+		// Оси пола, выровненные с камерой.
+		Vector3 camRight = _camera.GlobalTransform.Basis.X;
+		Vector3 camLook = -_camera.GlobalTransform.Basis.Z;
+		camRight.Y = 0f;
+		camLook.Y = 0f;
+
+		if (camRight.LengthSquared() < 0.0001f || camLook.LengthSquared() < 0.0001f)
+		{
+			return;
+		}
+
+		camRight = camRight.Normalized();
+		camLook = camLook.Normalized();
+
+		// Screen +X → вправо; Screen +Y (вниз) → к камере (−look).
+		Vector3 aimDir = (camRight * screenDelta.X) + (-camLook * screenDelta.Y);
+		if (aimDir.LengthSquared() < 0.0001f)
+		{
+			return;
+		}
+
+		_aimForward = aimDir.Normalized();
 
 		Vector3 aimOrigin = AimPivot?.GlobalPosition ?? GlobalPosition;
-		Vector3 lookAt = hitPoint.Value;
-		lookAt.Y = aimOrigin.Y;
-
-		Vector3 toTarget = lookAt - aimOrigin;
-		toTarget.Y = 0f;
-		if (toTarget.LengthSquared() < 0.0001f)
-		{
-			return;
-		}
-
-		_aimForward = toTarget.Normalized();
+		Vector3 lookAt = aimOrigin + _aimForward;
 		AimPivot?.LookAt(lookAt, Vector3.Up);
-	}
-
-	private Vector3? RaycastAimPoint(Vector3 origin, Vector3 direction)
-	{
-		PhysicsDirectSpaceState3D space = GetWorld3D().DirectSpaceState;
-		var query = PhysicsRayQueryParameters3D.Create(
-			origin,
-			origin + direction * AimRayLength
-		);
-		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-		query.CollisionMask = CombatLayers.World | CombatLayers.Enemy;
-
-		var result = space.IntersectRay(query);
-		if (result.Count == 0)
-		{
-			return null;
-		}
-
-		return (Vector3)result["position"];
-	}
-
-	private Vector3? IntersectAimPlane(Vector3 origin, Vector3 direction)
-	{
-		var plane = new Plane(Vector3.Up, AimPlaneY);
-		return plane.IntersectsRay(origin, direction);
 	}
 
 	private void OnDamaged(int amount, Vector3 sourcePosition)
 	{
 		SetBodyColor(new Color(0.95f, 0.85f, 0.85f, 1f));
 		_flashTimer = 0.1f;
+	}
+
+	/// <summary>Визуал Скверны: emission нарастает с шкалой.</summary>
+	public void SetBlightVisual(float normalized, bool overloaded)
+	{
+		if (_bodyMaterial == null || _flashTimer > 0f)
+		{
+			return;
+		}
+
+		Color albedo = _baseColor.Lerp(new Color(0.35f, 0.06f, 0.08f), normalized * 0.55f);
+		_bodyMaterial.AlbedoColor = albedo;
+		_bodyMaterial.EmissionEnabled = normalized > 0.05f;
+		_bodyMaterial.Emission = new Color(0.55f, 0.08f, 0.1f);
+		_bodyMaterial.EmissionEnergyMultiplier = Mathf.Lerp(0f, overloaded ? 1.6f : 0.9f, normalized);
 	}
 
 	private void SetBodyColor(Color color)

@@ -1,9 +1,11 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Player/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
 [ext_resource type="Script" path="res://Scripts/Player/PlayerAttack.cs" id="3_attack"]
 [ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="4_hitbox"]
+[ext_resource type="Script" path="res://Scripts/Combat/Blight.cs" id="5_blight"]
+[ext_resource type="Script" path="res://Scripts/Combat/BlightController.cs" id="6_blight_ctrl"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.35
@@ -47,10 +49,25 @@ script = ExtResource("2_health")
 MaxHealth = 100
 InvulnerabilityDuration = 0.5
 
-[node name="PlayerAttack" type="Node" parent="." node_paths=PackedStringArray("Hitbox", "Health")]
+[node name="Blight" type="Node" parent="."]
+script = ExtResource("5_blight")
+MaxBlight = 100.0
+HighThreshold = 60.0
+
+[node name="BlightController" type="Node" parent="." node_paths=PackedStringArray("Blight", "Health", "Player")]
+script = ExtResource("6_blight_ctrl")
+Blight = NodePath("../Blight")
+Health = NodePath("../Health")
+Player = NodePath("..")
+BlightPerDamageTaken = 0.55
+BlightPerHeavyAttack = 16.0
+OverloadDrainPerSecond = 14.0
+
+[node name="PlayerAttack" type="Node" parent="." node_paths=PackedStringArray("Hitbox", "Health", "BlightController")]
 script = ExtResource("3_attack")
 Hitbox = NodePath("../Visual/Hitbox")
 Health = NodePath("../Health")
+BlightController = NodePath("../BlightController")
 WindupTime = 0.1
 ActiveTime = 0.12
 CooldownTime = 0.42
