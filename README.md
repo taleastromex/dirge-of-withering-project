@@ -37,7 +37,7 @@ dotnet --version
 
 1. Открыть папку проекта в **Godot (.NET)** (`project.godot`)
 2. **Project → Rebuild Project** (или иконка Build)
-3. **F5** — стартует `Scenes/TestWorld.tscn`
+3. **F5** — стартует `Scenes/Locations/FloodedCathedralSlice.tscn`
 
 CLI (опционально):
 
@@ -63,31 +63,24 @@ Input Map: `move_up/down/left/right`, `attack`.
 
 ```
 Scripts/
-  Camera/FollowCamera.cs      # следование за целью, без наследования yaw игрока
-  Combat/
-    Health.cs                 # HP, i-frames, сигналы Damaged/Died
-    Hitbox3D.cs               # Area3D-удар, knockback, hit-stop
-    CombatHitStop.cs          # краткий Engine.TimeScale pulse
-    CombatLayers.cs           # битовые маски слоёв
-  Player/
-    Player.cs                 # CharacterBody3D: aim + move + knockback
-    PlayerAttack.cs           # wind-up → active → cooldown
-  Enemy/
-    BasicEnemy.cs             # chase / telegraph / attack / stagger
-    EnemySpawner.cs           # респавн для прогона баланса
-  UI/DebugHud.cs              # прототипный HP overlay
+  Camera/FollowCamera.cs
+  Combat/                     # Health, Hitbox3D, hit-stop, layers
+  Player/                     # move / aim / attack
+  Enemy/                      # BasicEnemy, EnemySpawner
+  World/ErrengardPalette.cs   # палитра среза (пепел / багровый / жёлтый)
+  UI/DebugHud.cs
 Scenes/
-  TestWorld.tscn              # арена Core Loop (main scene)
+  Locations/FloodedCathedralSlice.tscn   # main scene (Vertical Slice 2.1)
+  TestWorld.tscn                         # песочница Core Loop
   Player/Player.tscn
   Enemy/BasicEnemy.tscn
-CONCEPT.md                    # дизайн / лор
+CONCEPT.md
 ```
 
+## Архитектура геймплея
 
-
-## Архитектура геймплея (Core Loop)
-
-Текущий этап — **прототип боевого цикла**: движение → удар → урон → смерть врага / рестарт игрока.
+**Сейчас:** этап **2.1** — каркас Vertical Slice на локации «Затопленный собор».  
+Core Loop (движение → удар → урон → смерть) перенесён как есть; DebugHud пока остаётся.
 
 ```
 Player (CharacterBody3D)
@@ -155,6 +148,18 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 Триггеры: `push` / `pull_request` в `master`|`main`, плюс `workflow_dispatch`.  
 Версию Godot в CI держим синхронно с `Godot.NET.Sdk` в `.csproj`.
+
+## Роудмап
+
+| Этап | Цель | Статус |
+|------|------|--------|
+| 1. Core Loop | Move / attack / damage / death | Готово |
+| 2.1 Каркас среза | Локация «Затопленный собор», палитра, Core Loop на месте | **Сейчас** |
+| 2.2 Скверна | Шкала, бафф, перегрузка | Дальше |
+| 2.3 Канон-враг | Читаемый архетип под лор | Дальше |
+| 2.4–2.7 | Арт маршрута, UI, звук, критерий «5 минут атмосферы» | Дальше |
+
+Песочница Core Loop: `Scenes/TestWorld.tscn` (не main).
 
 ## Документация
 

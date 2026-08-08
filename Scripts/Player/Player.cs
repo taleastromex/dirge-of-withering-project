@@ -42,6 +42,13 @@ public partial class Player : CharacterBody3D
 	[Export]
 	public float KnockbackDuration { get; set; } = 0.12f;
 
+	/// <summary>Фиксирует Y (top-down без гравитации / наклонов).</summary>
+	[Export]
+	public bool LockVerticalPosition { get; set; } = true;
+
+	[Export]
+	public float LockedY { get; set; } = 0f;
+
 	private Camera3D? _camera;
 	private Vector3 _aimForward = Vector3.Forward;
 	private bool _isDead;
@@ -63,10 +70,21 @@ public partial class Player : CharacterBody3D
 		BodyMesh ??= GetNodeOrNull<MeshInstance3D>("Visual/Body");
 		_camera = GetViewport().GetCamera3D();
 
-		if (BodyMesh?.GetActiveMaterial(0) is StandardMaterial3D mat)
+		// Дублируем материал: flash урона не должен мутировать shared resource сцены.
+		if (BodyMesh != null)
 		{
-			_bodyMaterial = mat;
-			_baseColor = mat.AlbedoColor;
+			Material? source = BodyMesh.GetActiveMaterial(0) ?? BodyMesh.MaterialOverride;
+			if (source is StandardMaterial3D shared)
+			{
+				_bodyMaterial = (StandardMaterial3D)shared.Duplicate();
+				_baseColor = _bodyMaterial.AlbedoColor;
+			}
+			else
+			{
+				_bodyMaterial = new StandardMaterial3D { AlbedoColor = _baseColor, Roughness = 0.85f };
+			}
+
+			BodyMesh.MaterialOverride = _bodyMaterial;
 		}
 
 		if (Health != null)
@@ -104,10 +122,28 @@ public partial class Player : CharacterBody3D
 			Velocity = new Vector3(_knockbackVelocity.X, Velocity.Y, _knockbackVelocity.Z);
 			_knockbackVelocity = _knockbackVelocity.MoveToward(Vector3.Zero, 40f * dt);
 			MoveAndSlide();
+			ApplyVerticalLock();
 			return;
 		}
 
 		HandleMovement(dt);
+		ApplyVerticalLock();
+	}
+
+	private void ApplyVerticalLock()
+	{
+		if (!LockVerticalPosition)
+		{
+			return;
+		}
+
+		Vector3 pos = GlobalPosition;
+		if (!Mathf.IsEqualApprox(pos.Y, LockedY))
+		{
+			GlobalPosition = new Vector3(pos.X, LockedY, pos.Z);
+		}
+
+		Velocity = new Vector3(Velocity.X, 0f, Velocity.Z);
 	}
 
 	public void ApplyKnockback(Vector3 sourcePosition, float force)
