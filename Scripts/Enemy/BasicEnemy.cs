@@ -94,16 +94,8 @@ public partial class BasicEnemy : CharacterBody3D
 			Hitbox.SetActive(false);
 		}
 
-		if (BodyMesh?.GetActiveMaterial(0) is StandardMaterial3D mat)
-		{
-			_bodyMaterial = mat;
-			_baseColor = mat.AlbedoColor;
-		}
-		else if (BodyMesh != null)
-		{
-			_bodyMaterial = new StandardMaterial3D { AlbedoColor = _baseColor, Roughness = 0.9f };
-			BodyMesh.MaterialOverride = _bodyMaterial;
-		}
+		// Материал из .tscn общий на все инстансы — дублируем, иначе stagger/телеграф красит всех.
+		EnsureUniqueBodyMaterial();
 
 		if (Health != null)
 		{
@@ -349,6 +341,27 @@ public partial class BasicEnemy : CharacterBody3D
 		a.Y = 0f;
 		b.Y = 0f;
 		return a.DistanceTo(b);
+	}
+
+	private void EnsureUniqueBodyMaterial()
+	{
+		if (BodyMesh == null)
+		{
+			return;
+		}
+
+		Material? source = BodyMesh.GetActiveMaterial(0) ?? BodyMesh.MaterialOverride;
+		if (source is StandardMaterial3D shared)
+		{
+			_bodyMaterial = (StandardMaterial3D)shared.Duplicate();
+			_baseColor = _bodyMaterial.AlbedoColor;
+		}
+		else
+		{
+			_bodyMaterial = new StandardMaterial3D { AlbedoColor = _baseColor, Roughness = 0.9f };
+		}
+
+		BodyMesh.MaterialOverride = _bodyMaterial;
 	}
 
 	private void SetBodyColor(Color color)
