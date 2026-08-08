@@ -1,0 +1,20 @@
+# Godot
+.godot/
+*.translation
+
+# C# / .NET
+.mono/
+data_*/
+mono_crash.*.json
+bin/
+obj/
+*.csproj.user
+*.sln.DotSettings.user
+
+# OS / IDE
+.DS_Store
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
