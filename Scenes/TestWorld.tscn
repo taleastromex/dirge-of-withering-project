@@ -1,0 +1,131 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="PackedScene" path="res://Scenes/Player/Player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://Scripts/Camera/FollowCamera.cs" id="2_camera"]
+[ext_resource type="PackedScene" path="res://Scenes/Enemy/BasicEnemy.tscn" id="3_enemy"]
+[ext_resource type="Script" path="res://Scripts/UI/DebugHud.cs" id="4_hud"]
+[ext_resource type="Script" path="res://Scripts/Enemy/EnemySpawner.cs" id="5_spawner"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.14, 0.13, 0.15, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_floor"]
+size = Vector3(28, 0.2, 28)
+
+[sub_resource type="BoxShape3D" id="BoxShape_floor"]
+size = Vector3(28, 0.2, 28)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wall"]
+albedo_color = Color(0.28, 0.26, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_wall"]
+size = Vector3(1.5, 3, 8)
+
+[sub_resource type="BoxShape3D" id="BoxShape_wall"]
+size = Vector3(1.5, 3, 8)
+
+[sub_resource type="StandardMaterial3D" id="Mat_block"]
+albedo_color = Color(0.22, 0.2, 0.24, 1)
+roughness = 0.92
+
+[sub_resource type="BoxMesh" id="BoxMesh_block"]
+size = Vector3(2, 1, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape_block"]
+size = Vector3(2, 1, 2)
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 1
+background_color = Color(0.08, 0.07, 0.09, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.35, 0.32, 0.4, 1)
+ambient_light_energy = 0.55
+tonemap_mode = 2
+
+[node name="TestWorld" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 0, 10, 0)
+light_color = Color(0.85, 0.78, 0.7, 1)
+light_energy = 1.1
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+collision_layer = 1
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("BoxMesh_floor")
+surface_material_override/0 = SubResource("Mat_floor")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape_floor")
+
+[node name="Wall" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1.5, 0)
+collision_layer = 1
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Wall"]
+mesh = SubResource("BoxMesh_wall")
+surface_material_override/0 = SubResource("Mat_wall")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wall"]
+shape = SubResource("BoxShape_wall")
+
+[node name="Block" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.5, -5)
+collision_layer = 1
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Block"]
+mesh = SubResource("BoxMesh_block")
+surface_material_override/0 = SubResource("Mat_block")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Block"]
+shape = SubResource("BoxShape_block")
+
+[node name="Block2" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 5)
+collision_layer = 1
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Block2"]
+mesh = SubResource("BoxMesh_block")
+surface_material_override/0 = SubResource("Mat_block")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Block2"]
+shape = SubResource("BoxShape_block")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
+
+[node name="EnemySpawner" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+script = ExtResource("5_spawner")
+EnemyScene = ExtResource("3_enemy")
+RespawnDelay = 2.5
+
+[node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("Target")]
+script = ExtResource("2_camera")
+Target = NodePath("../Player")
+Offset = Vector3(10, 12, 10)
+SmoothSpeed = 8.0
+LookAtOffset = Vector3(0, 1, 0)
+
+[node name="Camera3D" type="Camera3D" parent="FollowCamera"]
+fov = 40.0
+current = true
+near = 0.1
+far = 200.0
+
+[node name="DebugHud" type="CanvasLayer" parent="."]
+script = ExtResource("4_hud")
+PlayerPath = NodePath("../Player")
+EnemyPath = NodePath("")
