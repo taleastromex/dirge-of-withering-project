@@ -3,7 +3,7 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Прототипный HUD среза: полоски HP / Скверны + подсказки.
+/// Прототипный HUD среза: полоски HP / Скверны + ближайший враг по имени.
 /// </summary>
 public partial class DebugHud : CanvasLayer
 {
@@ -17,6 +17,8 @@ public partial class DebugHud : CanvasLayer
 	private Label? _blightLabel;
 	private Health? _playerHealth;
 	private Blight? _playerBlight;
+	private Node3D? _playerNode;
+	private BasicEnemy? _focusEnemy;
 	private Health? _enemyHealth;
 
 	private static readonly Color HpFill = new(0.65f, 0.18f, 0.22f);
@@ -37,11 +39,7 @@ public partial class DebugHud : CanvasLayer
 			ResolvePlayer();
 		}
 
-		if (_enemyHealth == null || !GodotObject.IsInstanceValid(_enemyHealth))
-		{
-			ResolveEnemy();
-		}
-
+		ResolveClosestEnemy();
 		UpdateBars();
 	}
 
@@ -50,7 +48,7 @@ public partial class DebugHud : CanvasLayer
 		var root = new VBoxContainer
 		{
 			Position = new Vector2(16, 16),
-			CustomMinimumSize = new Vector2(280, 0)
+			CustomMinimumSize = new Vector2(300, 0)
 		};
 		AddChild(root);
 
@@ -81,7 +79,7 @@ public partial class DebugHud : CanvasLayer
 	{
 		var bar = new ProgressBar
 		{
-			CustomMinimumSize = new Vector2(280, 18),
+			CustomMinimumSize = new Vector2(300, 18),
 			MaxValue = 100,
 			Value = 0,
 			ShowPercentage = false
@@ -165,12 +163,19 @@ public partial class DebugHud : CanvasLayer
 			return;
 		}
 
-		string enemyText = _enemyHealth != null && GodotObject.IsInstanceValid(_enemyHealth)
-			? $"Enemy {_enemyHealth.Current}/{_enemyHealth.MaxHealth}"
-			: "Enemy respawning…";
+		string enemyText;
+		if (_focusEnemy != null && GodotObject.IsInstanceValid(_focusEnemy) &&
+			_enemyHealth != null && GodotObject.IsInstanceValid(_enemyHealth))
+		{
+			enemyText = $"{_focusEnemy.DisplayName}  {_enemyHealth.Current}/{_enemyHealth.MaxHealth}";
+		}
+		else
+		{
+			enemyText = "Враги: —";
+		}
 
 		_statusLabel.Text =
-			$"{enemyText}\nLMB attack | RMB heavy (+blight)\nAltar cleanses blight";
+			$"{enemyText}\nLMB удар | RMB тяжёлый (+Скверна)\nАлтарь очищает Скверну";
 	}
 
 	private static void SetBarFill(ProgressBar bar, Color color)
@@ -196,19 +201,48 @@ public partial class DebugHud : CanvasLayer
 	private void ResolveTargets()
 	{
 		ResolvePlayer();
-		ResolveEnemy();
+		ResolveClosestEnemy();
 	}
 
 	private void ResolvePlayer()
 	{
-		Node? player = GetNodeOrNull(PlayerPath) ?? GetTree().GetFirstNodeInGroup("player");
-		_playerHealth = player?.GetNodeOrNull<Health>("Health");
-		_playerBlight = player?.GetNodeOrNull<Blight>("Blight");
+		_playerNode = GetNodeOrNull(PlayerPath) as Node3D
+			?? GetTree().GetFirstNodeInGroup("player") as Node3D;
+		_playerHealth = _playerNode?.GetNodeOrNull<Health>("Health");
+		_playerBlight = _playerNode?.GetNodeOrNull<Blight>("Blight");
 	}
 
-	private void ResolveEnemy()
+	private void ResolveClosestEnemy()
 	{
-		Node? enemy = GetTree().GetFirstNodeInGroup("enemies");
-		_enemyHealth = enemy?.GetNodeOrNull<Health>("Health");
+		_focusEnemy = null;
+		_enemyHealth = null;
+
+		if (_playerNode == null || !GodotObject.IsInstanceValid(_playerNode))
+		{
+			return;
+		}
+
+		float best = float.MaxValue;
+		foreach (Node node in GetTree().GetNodesInGroup("enemies"))
+		{
+			if (node is not BasicEnemy enemy || !GodotObject.IsInstanceValid(enemy))
+			{
+				continue;
+			}
+
+			Health? health = enemy.GetNodeOrNull<Health>("Health");
+			if (health == null || health.IsDead)
+			{
+				continue;
+			}
+
+			float d = _playerNode.GlobalPosition.DistanceSquaredTo(enemy.GlobalPosition);
+			if (d < best)
+			{
+				best = d;
+				_focusEnemy = enemy;
+				_enemyHealth = health;
+			}
+		}
 	}
 }

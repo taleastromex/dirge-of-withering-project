@@ -53,7 +53,7 @@ public partial class PlayerAttack : Node
 	public float HeavyCooldownTime { get; set; } = 0.55f;
 
 	[Export]
-	public int HeavyDamage { get; set; } = 42;
+	public int HeavyDamage { get; set; } = 56;
 
 	[Export]
 	public float HeavyKnockbackForce { get; set; } = 12f;

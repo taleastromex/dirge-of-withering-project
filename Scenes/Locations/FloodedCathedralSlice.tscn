@@ -2,12 +2,13 @@
 
 [ext_resource type="PackedScene" path="res://Scenes/Player/Player.tscn" id="1_player"]
 [ext_resource type="Script" uid="uid://c4s8spnl471xo" path="res://Scripts/Camera/FollowCamera.cs" id="2_camera"]
-[ext_resource type="PackedScene" path="res://Scenes/Enemy/BasicEnemy.tscn" id="3_enemy"]
+[ext_resource type="PackedScene" path="res://Scenes/Enemy/MutantBrute.tscn" id="3_enemy_mutant"]
+[ext_resource type="PackedScene" path="res://Scenes/Enemy/ZombieThrall.tscn" id="3_enemy_zombie"]
 [ext_resource type="Script" uid="uid://c6dj15pp7wov4" path="res://Scripts/UI/DebugHud.cs" id="4_hud"]
 [ext_resource type="Script" uid="uid://w6kekkc2q3ah" path="res://Scripts/Enemy/EnemySpawner.cs" id="5_spawner"]
 [ext_resource type="Script" uid="uid://r1wdfs5o352g" path="res://Scripts/Camera/CameraOcclusionFader.cs" id="6_fader"]
 [ext_resource type="Script" uid="uid://kndyyu0xvjmt" path="res://Scripts/World/SliceAtmosphere.cs" id="7_atmosphere"]
-[ext_resource type="Script" path="res://Scripts/World/BlightAltar.cs" id="8_altar"]
+[ext_resource type="Script" uid="uid://bqoafblabre3d" path="res://Scripts/World/BlightAltar.cs" id="8_altar"]
 
 [sub_resource type="Environment" id="Environment_slice"]
 background_mode = 1
@@ -337,18 +338,15 @@ surface_material_override/0 = SubResource("Mat_altar")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/AltarStub" unique_id=1720816338]
 shape = SubResource("Shape_altar")
 
-[node name="BlightAltar" type="Area3D" parent="Geometry/AltarStub" node_paths=PackedStringArray("VisualMesh")]
+[node name="BlightAltar" type="Area3D" parent="Geometry/AltarStub" unique_id=1799456079 node_paths=PackedStringArray("VisualMesh")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.8)
 collision_layer = 0
 collision_mask = 2
-monitoring = true
 monitorable = false
 script = ExtResource("8_altar")
-CleansePerSecond = 38.0
-EnterBurstCleanse = 22.0
 VisualMesh = NodePath("../MeshInstance3D")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/AltarStub/BlightAltar"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/AltarStub/BlightAltar" unique_id=15638508]
 shape = SubResource("Shape_altar_cleanse")
 
 [node name="PlayerSpawn" type="Marker3D" parent="." unique_id=1445619420]
@@ -360,19 +358,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 15.2)
 [node name="EnemySpawnerMid" type="Node3D" parent="." unique_id=599366945]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 1.5)
 script = ExtResource("5_spawner")
-EnemyScene = ExtResource("3_enemy")
+EnemyScene = ExtResource("3_enemy_mutant")
 RespawnDelay = 4.0
 
 [node name="EnemySpawnerApse" type="Node3D" parent="." unique_id=72316438]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0, -10)
 script = ExtResource("5_spawner")
-EnemyScene = ExtResource("3_enemy")
+EnemyScene = ExtResource("3_enemy_zombie")
 RespawnDelay = 5.0
 
 [node name="FollowCamera" type="Node3D" parent="." unique_id=838379956 node_paths=PackedStringArray("Target")]
 script = ExtResource("2_camera")
 Target = NodePath("../Player")
-Offset = Vector3(0, 11.5, 8)
+Offset = Vector3(0, 8.5, 8)
 SmoothSpeed = 6.5
 LookAtOffset = Vector3(0, 1.15, 0)
 

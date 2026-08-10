@@ -1,0 +1,89 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Enemy/BasicEnemy.cs" id="1_enemy"]
+[ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
+[ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="3_hitbox"]
+[ext_resource type="Script" path="res://Scripts/Enemy/EnemyAnimDriver.cs" id="4_anim"]
+[ext_resource type="PackedScene" path="res://Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall.glb" id="5_model"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.42
+height = 1.7
+
+[sub_resource type="BoxShape3D" id="BoxShape_hitbox"]
+size = Vector3(0.85, 0.7, 0.9)
+
+[sub_resource type="StandardMaterial3D" id="Mat_hitbox_debug"]
+transparency = 1
+albedo_color = Color(0.55, 0.75, 0.25, 0.35)
+roughness = 1.0
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_hitbox_debug"]
+size = Vector3(0.85, 0.7, 0.9)
+
+[node name="ZombieThrall" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_enemy")
+DisplayName = "Пепельный ходок"
+MoveSpeed = 1.4
+DetectRange = 11.0
+AttackRange = 1.4
+TelegraphTime = 0.5
+RecoveryTime = 0.65
+StaggerTime = 0.42
+AttackDamage = 18
+AttackKnockback = 5.5
+DeathDespawnDelay = 3.0
+HighBlightSpeedMul = 1.2
+HighBlightTelegraphMul = 0.8
+AttackFallbackDuration = 1.25
+FaceTurnSpeed = 5.5
+AshTint = Color(0.72, 0.76, 0.68, 1)
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+MaxHealth = 56
+InvulnerabilityDuration = 0.12
+
+[node name="AnimDriver" type="Node" parent="."]
+script = ExtResource("4_anim")
+IdleClip = "idle"
+ChaseClip = "walk"
+TelegraphClip = "stagger"
+AttackClip = "attack"
+StaggerClip = "stagger"
+DeathClip = "death"
+AttackHitNormStart = 0.45
+AttackHitNormEnd = 0.72
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Model" parent="Visual" instance=ExtResource("5_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Hitbox" type="Area3D" parent="Visual" node_paths=PackedStringArray("OwnerRoot", "DebugMesh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.75)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+monitoring = false
+script = ExtResource("3_hitbox")
+Damage = 18
+KnockbackForce = 5.5
+HitStopSeconds = 0.05
+OwnerRoot = NodePath("../..")
+DebugMesh = NodePath("DebugMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
+shape = SubResource("BoxShape_hitbox")
+
+[node name="DebugMesh" type="MeshInstance3D" parent="Visual/Hitbox"]
+visible = false
+mesh = SubResource("BoxMesh_hitbox_debug")
+surface_material_override/0 = SubResource("Mat_hitbox_debug")
