@@ -34,22 +34,28 @@ public partial class SliceAtmosphere : Node3D
 		if (GetNodeOrNull<DirectionalLight3D>("Lighting/KeyLight") is { } key)
 		{
 			key.LightColor = ErrengardPalette.KeyLight;
-			key.LightEnergy = 0.55f;
+			key.LightEnergy = 0.62f;
 		}
 
 		if (GetNodeOrNull<DirectionalLight3D>("Lighting/FillLight") is { } fill)
 		{
 			fill.LightColor = ErrengardPalette.FillLight;
-			fill.LightEnergy = 0.18f;
+			fill.LightEnergy = 0.22f;
 		}
 
 		foreach (Node node in GetTree().GetNodesInGroup("ichor_glow"))
 		{
 			if (node is OmniLight3D omni)
 			{
-				omni.LightColor = ErrengardPalette.IchorCrimson;
-				omni.LightEnergy = 1.4f;
+				omni.LightColor = ErrengardPalette.IchorCrimson.Lightened(0.15f);
+				omni.LightEnergy = 2.35f;
 			}
+		}
+
+		if (GetNodeOrNull<OmniLight3D>("Lighting/AltarGlow") is { } altarGlow)
+		{
+			altarGlow.LightColor = ErrengardPalette.BoneYellow;
+			altarGlow.LightEnergy = 1.1f;
 		}
 
 		foreach (Node node in GetTree().GetNodesInGroup("breach_light"))
@@ -65,9 +71,17 @@ public partial class SliceAtmosphere : Node3D
 	{
 		foreach (Node child in root.GetChildren())
 		{
+			// Sketchfab-сборка уже с PBR/тинтом — не затираем albedo палитрой.
+			if (child.Name == "CathedralArt")
+			{
+				continue;
+			}
+
 			if (child is MeshInstance3D mesh)
 			{
-				ApplyMeshMaterial(mesh, child.GetParent()?.Name.ToString() ?? child.Name.ToString());
+				string ownerName = child.GetParent()?.Name.ToString() ?? child.Name.ToString();
+				string hint = $"{ownerName}/{mesh.Name}";
+				ApplyMeshMaterial(mesh, hint);
 			}
 
 			ApplyMaterialsRecursive(child);
@@ -98,14 +112,30 @@ public partial class SliceAtmosphere : Node3D
 			mat.Roughness = 0.96f;
 		}
 		else if (name.Contains("Ichor", System.StringComparison.OrdinalIgnoreCase)
-			|| name.Contains("Puddle", System.StringComparison.OrdinalIgnoreCase))
+			|| name.Contains("Puddle", System.StringComparison.OrdinalIgnoreCase)
+			|| name.Contains("WetStain", System.StringComparison.OrdinalIgnoreCase))
 		{
-			mat.AlbedoColor = ErrengardPalette.IchorCrimson;
-			mat.Roughness = 0.3f;
-			mat.Metallic = 0.2f;
+			bool isSurface = mesh.Name.ToString().Contains("Surface", System.StringComparison.OrdinalIgnoreCase);
+			bool isCore = mesh.Name.ToString().Contains("Core", System.StringComparison.OrdinalIgnoreCase);
+			bool isStain = name.Contains("WetStain", System.StringComparison.OrdinalIgnoreCase);
+
+			mat.AlbedoColor = isStain
+				? new Color(0.12f, 0.06f, 0.08f, 0.55f)
+				: isSurface
+					? new Color(0.55f, 0.08f, 0.12f, 0.55f)
+					: isCore
+						? new Color(0.22f, 0.02f, 0.04f, 1f)
+						: new Color(0.42f, 0.05f, 0.08f, 0.92f);
+			mat.Transparency = isStain || isSurface || !isCore
+				? BaseMaterial3D.TransparencyEnum.Alpha
+				: BaseMaterial3D.TransparencyEnum.Disabled;
+			mat.Roughness = isSurface ? 0.12f : isCore ? 0.45f : 0.22f;
+			mat.Metallic = isSurface ? 0.55f : 0.28f;
 			mat.EmissionEnabled = true;
-			mat.Emission = ErrengardPalette.IchorCrimson;
-			mat.EmissionEnergyMultiplier = 0.55f;
+			mat.Emission = isCore
+				? new Color(0.9f, 0.12f, 0.16f)
+				: ErrengardPalette.IchorCrimson.Lightened(isSurface ? 0.35f : 0.1f);
+			mat.EmissionEnergyMultiplier = isCore ? 2.4f : isSurface ? 1.8f : isStain ? 0.25f : 1.15f;
 		}
 		else if (name.Contains("Altar", System.StringComparison.OrdinalIgnoreCase)
 			|| name.Contains("Dais", System.StringComparison.OrdinalIgnoreCase))

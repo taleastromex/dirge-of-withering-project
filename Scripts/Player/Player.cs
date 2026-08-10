@@ -9,7 +9,7 @@ namespace DirgeOfWithering;
 public partial class Player : CharacterBody3D
 {
 	[Export]
-	public float MoveSpeed { get; set; } = 6f;
+	public float MoveSpeed { get; set; } = 4.0f;
 
 	[Export]
 	public float Acceleration { get; set; } = 0f;
@@ -38,7 +38,10 @@ public partial class Player : CharacterBody3D
 	public MeshInstance3D? BodyMesh { get; set; }
 
 	[Export]
-	public float DeathRestartDelay { get; set; } = 0.85f;
+	public PlayerAnimDriver? AnimDriver { get; set; }
+
+	[Export]
+	public float DeathRestartDelay { get; set; } = 1.6f;
 
 	/// <summary>Множитель скорости во время замаха/удара.</summary>
 	[Export]
@@ -61,7 +64,7 @@ public partial class Player : CharacterBody3D
 	private Vector3 _knockbackVelocity;
 	private float _knockbackTimer;
 
-	private StandardMaterial3D? _bodyMaterial;
+	private readonly System.Collections.Generic.List<StandardMaterial3D> _bodyMaterials = new();
 	private Color _baseColor = new(0.55f, 0.18f, 0.22f, 1f);
 	private float _flashTimer;
 
@@ -73,25 +76,11 @@ public partial class Player : CharacterBody3D
 		Health ??= GetNodeOrNull<Health>("Health");
 		Attack ??= GetNodeOrNull<PlayerAttack>("PlayerAttack");
 		BlightController ??= GetNodeOrNull<BlightController>("BlightController");
+		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("AnimDriver");
 		BodyMesh ??= GetNodeOrNull<MeshInstance3D>("Visual/Body");
 		_camera = GetViewport().GetCamera3D();
 
-		// Дублируем материал: flash урона не должен мутировать shared resource сцены.
-		if (BodyMesh != null)
-		{
-			Material? source = BodyMesh.GetActiveMaterial(0) ?? BodyMesh.MaterialOverride;
-			if (source is StandardMaterial3D shared)
-			{
-				_bodyMaterial = (StandardMaterial3D)shared.Duplicate();
-				_baseColor = _bodyMaterial.AlbedoColor;
-			}
-			else
-			{
-				_bodyMaterial = new StandardMaterial3D { AlbedoColor = _baseColor, Roughness = 0.85f };
-			}
-
-			BodyMesh.MaterialOverride = _bodyMaterial;
-		}
+		CaptureBodyMaterials();
 
 		if (Health != null)
 		{
@@ -134,6 +123,9 @@ public partial class Player : CharacterBody3D
 
 		HandleMovement(dt);
 		ApplyVerticalLock();
+
+		Vector3 planar = new(Velocity.X, 0f, Velocity.Z);
+		AnimDriver?.UpdateLocomotion(planar.Length());
 	}
 
 	private void ApplyVerticalLock()
@@ -280,23 +272,94 @@ public partial class Player : CharacterBody3D
 	/// <summary>Визуал Скверны: emission нарастает с шкалой.</summary>
 	public void SetBlightVisual(float normalized, bool overloaded)
 	{
-		if (_bodyMaterial == null || _flashTimer > 0f)
+		if (_bodyMaterials.Count == 0 || _flashTimer > 0f)
 		{
 			return;
 		}
 
 		Color albedo = _baseColor.Lerp(new Color(0.35f, 0.06f, 0.08f), normalized * 0.55f);
-		_bodyMaterial.AlbedoColor = albedo;
-		_bodyMaterial.EmissionEnabled = normalized > 0.05f;
-		_bodyMaterial.Emission = new Color(0.55f, 0.08f, 0.1f);
-		_bodyMaterial.EmissionEnergyMultiplier = Mathf.Lerp(0f, overloaded ? 1.6f : 0.9f, normalized);
+		float emission = Mathf.Lerp(0f, overloaded ? 1.6f : 0.9f, normalized);
+		foreach (StandardMaterial3D mat in _bodyMaterials)
+		{
+			mat.AlbedoColor = albedo;
+			mat.EmissionEnabled = normalized > 0.05f;
+			mat.Emission = new Color(0.55f, 0.08f, 0.1f);
+			mat.EmissionEnergyMultiplier = emission;
+		}
 	}
 
 	private void SetBodyColor(Color color)
 	{
-		if (_bodyMaterial != null)
+		foreach (StandardMaterial3D mat in _bodyMaterials)
 		{
-			_bodyMaterial.AlbedoColor = color;
+			mat.AlbedoColor = color;
+		}
+	}
+
+	private void CaptureBodyMaterials()
+	{
+		_bodyMaterials.Clear();
+		System.Collections.Generic.List<MeshInstance3D> meshes = new();
+		if (BodyMesh != null && BodyMesh.Visible)
+		{
+			meshes.Add(BodyMesh);
+		}
+		else
+		{
+			CollectMeshes(GetNodeOrNull<Node>("Visual/Model") ?? GetNodeOrNull<Node>("Visual"), meshes);
+		}
+
+		foreach (MeshInstance3D mesh in meshes)
+		{
+			int surfaces = mesh.Mesh?.GetSurfaceCount() ?? 0;
+			if (surfaces <= 0 && mesh.MaterialOverride is StandardMaterial3D single)
+			{
+				StandardMaterial3D dup = (StandardMaterial3D)single.Duplicate();
+				if (_bodyMaterials.Count == 0)
+				{
+					_baseColor = dup.AlbedoColor;
+				}
+
+				mesh.MaterialOverride = dup;
+				_bodyMaterials.Add(dup);
+				continue;
+			}
+
+			for (int i = 0; i < surfaces; i++)
+			{
+				Material? source = mesh.GetActiveMaterial(i);
+				if (source is not StandardMaterial3D shared)
+				{
+					continue;
+				}
+
+				StandardMaterial3D dup = (StandardMaterial3D)shared.Duplicate();
+				if (_bodyMaterials.Count == 0)
+				{
+					_baseColor = dup.AlbedoColor;
+				}
+
+				mesh.SetSurfaceOverrideMaterial(i, dup);
+				_bodyMaterials.Add(dup);
+			}
+		}
+	}
+
+	private static void CollectMeshes(Node? root, System.Collections.Generic.List<MeshInstance3D> into)
+	{
+		if (root == null)
+		{
+			return;
+		}
+
+		if (root is MeshInstance3D mi)
+		{
+			into.Add(mi);
+		}
+
+		foreach (Node child in root.GetChildren())
+		{
+			CollectMeshes(child, into);
 		}
 	}
 
@@ -311,6 +374,7 @@ public partial class Player : CharacterBody3D
 		Velocity = Vector3.Zero;
 		CollisionLayer = 0;
 		CollisionMask = 0;
+		AnimDriver?.PlayDeath();
 		SetBodyColor(new Color(0.2f, 0.12f, 0.14f, 1f));
 
 		GetTree().CreateTimer(DeathRestartDelay).Timeout += () =>

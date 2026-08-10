@@ -37,9 +37,20 @@ CLIP_MAPS = {
 		"zombie death.fbx": "death",
 		"zombie dying.fbx": "death_alt",
 	},
+	"blood_knight": {
+		"great sword idle.fbx": "idle",
+		"great sword walk.fbx": "walk",
+		"great sword run.fbx": "run",
+		"great sword slash.fbx": "attack",
+		"great sword high spin attack.fbx": "attack_heavy",
+		"great sword impact.fbx": "stagger",
+		"two handed sword death.fbx": "death",
+	},
 }
 
 LOOP_CLIPS = {"idle", "walk", "run"}
+# Death needs hips translation so the body settles on the floor.
+KEEP_HIPS_LOCATION_CLIPS = {"death", "death_alt"}
 HIPS_NAMES = {
 	"mixamorig:Hips",
 	"mixamorig5:Hips",
@@ -273,8 +284,9 @@ def merge(
 		else:
 			action = new_actions[-1]
 			action.name = sanitize_action_name(clip)
+			strip_hips = strip_root_motion and clip not in KEEP_HIPS_LOCATION_CLIPS
 			sanitized[action.name] = sanitize_action_tracks(
-				action, rotations_only=rotations_only, strip_root_motion=strip_root_motion
+				action, rotations_only=rotations_only, strip_root_motion=strip_hips
 			)
 			if clip in LOOP_CLIPS:
 				mark_loop(action)
