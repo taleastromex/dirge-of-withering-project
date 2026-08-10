@@ -1,10 +1,11 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Enemy/BasicEnemy.cs" id="1_enemy"]
 [ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
 [ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="3_hitbox"]
 [ext_resource type="Script" path="res://Scripts/Enemy/EnemyAnimDriver.cs" id="4_anim"]
 [ext_resource type="PackedScene" path="res://Assets/ThirdParty/BlightedWretch/Processed/MutantBrute.glb" id="5_model"]
+[ext_resource type="Script" path="res://Scripts/UI/EnemyNameplate.cs" id="6_plate"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.5
@@ -26,7 +27,7 @@ size = Vector3(1.35, 0.95, 1.4)
 collision_layer = 4
 collision_mask = 1
 script = ExtResource("1_enemy")
-DisplayName = "Ихор-зверь"
+DisplayName = "Ichor Beast"
 MoveSpeed = 3.45
 DetectRange = 15.0
 AttackRange = 2.05
@@ -57,6 +58,11 @@ StaggerClip = "stagger"
 DeathClip = "death"
 AttackHitNormStart = 0.4
 AttackHitNormEnd = 0.7
+
+[node name="Nameplate" type="Node3D" parent="."]
+script = ExtResource("6_plate")
+Title = "Ichor Beast"
+HeightOffset = 2.4
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92, 0)

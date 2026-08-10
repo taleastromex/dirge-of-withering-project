@@ -20,7 +20,7 @@ public partial class BasicEnemy : CharacterBody3D
 	}
 
 	[Export]
-	public string DisplayName { get; set; } = "Враг";
+	public string DisplayName { get; set; } = "Enemy";
 
 	[Export]
 	public float MoveSpeed { get; set; } = 3.35f;
@@ -91,6 +91,9 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public EnemyAnimDriver? AnimDriver { get; set; }
 
+	[Export]
+	public EnemyNameplate? Nameplate { get; set; }
+
 	private AiState _state = AiState.Idle;
 	private float _stateTimer;
 	private Node3D? _player;
@@ -121,6 +124,9 @@ public partial class BasicEnemy : CharacterBody3D
 		Visual ??= GetNodeOrNull<Node3D>("Visual");
 		BodyMesh ??= GetNodeOrNull<MeshInstance3D>("Visual/Body");
 		AnimDriver ??= GetNodeOrNull<EnemyAnimDriver>("AnimDriver");
+		Nameplate ??= GetNodeOrNull<EnemyNameplate>("Nameplate");
+		Nameplate?.SetTitle(DisplayName);
+		UpdateNameplateVisibility();
 
 		if (Hitbox != null)
 		{
@@ -280,6 +286,7 @@ public partial class BasicEnemy : CharacterBody3D
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		AnimDriver?.ResetSpeed();
 		AnimDriver?.PlayIdle();
+		UpdateNameplateVisibility();
 	}
 
 	private void EnterChase()
@@ -289,6 +296,7 @@ public partial class BasicEnemy : CharacterBody3D
 		Hitbox?.SetActive(false);
 		AnimDriver?.ResetSpeed();
 		AnimDriver?.PlayChase();
+		UpdateNameplateVisibility();
 	}
 
 	private void BeginTelegraph()
@@ -302,6 +310,7 @@ public partial class BasicEnemy : CharacterBody3D
 		FacePlayer(999f);
 		ApplyTelegraphTint();
 		AnimDriver?.PlayTelegraph();
+		UpdateNameplateVisibility();
 	}
 
 	private void BeginAttack()
@@ -313,6 +322,7 @@ public partial class BasicEnemy : CharacterBody3D
 		FacePlayer(999f);
 		ApplyHitboxTuning();
 		AnimDriver?.PlayAttack();
+		UpdateNameplateVisibility();
 
 		float len = AnimDriver?.GetCurrentLength() ?? 0f;
 		_stateTimer = len > 0.05f ? len : AttackFallbackDuration;
@@ -343,6 +353,7 @@ public partial class BasicEnemy : CharacterBody3D
 		Hitbox?.SetActive(false);
 		RestoreTint();
 		AnimDriver?.PlayIdle();
+		UpdateNameplateVisibility();
 	}
 
 	private void BeginStagger()
@@ -353,6 +364,14 @@ public partial class BasicEnemy : CharacterBody3D
 		Hitbox?.SetActive(false);
 		ApplyStaggerTint();
 		AnimDriver?.PlayStagger();
+		UpdateNameplateVisibility();
+	}
+
+	private void UpdateNameplateVisibility()
+	{
+		bool aggro = _state is AiState.Chase or AiState.Telegraph or AiState.Attack
+			or AiState.Recovery or AiState.Stagger;
+		Nameplate?.SetAggroVisible(aggro);
 	}
 
 	private void ResumeAfterInterrupt()
@@ -551,6 +570,7 @@ public partial class BasicEnemy : CharacterBody3D
 		_deathSettling = true;
 		_deathGroundOffsetApplied = 0f;
 		Hitbox?.SetActive(false);
+		UpdateNameplateVisibility();
 		SetTintMul(new Color(0.45f, 0.4f, 0.4f, 1f));
 
 		CollisionLayer = 0;

@@ -68,7 +68,7 @@ Scripts/
   Player/                     # move / aim / attack / PlayerAnimDriver
   Enemy/                      # BasicEnemy, EnemyAnimDriver, EnemySpawner
   World/ErrengardPalette.cs   # палитра среза (пепел / багровый / жёлтый)
-  UI/DebugHud.cs
+  UI/SliceHud.cs, EnemyNameplate.cs, DebugHud.cs (TestWorld)
 Scenes/
   Locations/FloodedCathedralSlice.tscn   # main scene (Vertical Slice)
   TestWorld.tscn                         # песочница Core Loop
@@ -88,16 +88,16 @@ CONCEPT.md
 ## Архитектура геймплея
 
 **Сейчас:** этап **2.4** — арт маршрута на Sketchfab-мешах.  
-Маршрут: вход → неф (Ихор-зверь) → апсида (Пепельный ходок) → алтарь очищения.  
+Маршрут: вход → неф (Ichor Beast) → апсида (Ash Walker) → алтарь очищения.  
 Визуал: `CathedralSliceArt.glb`; коллизии — прежние `StaticBody3D` в сцене.
 
-| Роль | Сцена | Имя в HUD | Характер |
-|------|-------|-----------|----------|
-| Давление | `MutantBrute` (неф) | Ихор-зверь | Быстрый, больший урон |
-| Блокер | `ZombieThrall` (апсида) | Пепельный ходок | Медленный, толстый |
+| Роль | Сцена | DisplayName | Характер |
+|------|-------|-------------|----------|
+| Давление | `MutantBrute` (неф) | Ichor Beast | Быстрый, больший урон |
+| Блокер | `ZombieThrall` (апсида) | Ash Walker | Медленный, толстый |
 
 Бой: телеграф → окно хитбокса → recovery; death держит позу.  
-Скверна (2.2) + алтарь-заглушка на месте.
+FILTH (2.2, код `Blight`) + алтарь на месте. HUD среза: `Health` / `FILTH` + nameplates над агро-NPC (EN).
 
 ```
 Player (CharacterBody3D)
@@ -155,7 +155,7 @@ MutantBrute / ZombieThrall (BasicEnemy)
 - Пути `res://` **case-sensitive** для C# bridge: держим `Scripts/`, `Scenes/`.
 - Не вызывать `AddChild` на родителе из `_Ready` ребёнка во время setup — использовать `CallDeferred` (см. `EnemySpawner`).
 - Экспорт тюнинга боя через `[Export]` на компонентах (`WindupTime`, `KnockbackForce`, …).
-
+- **In-game UI copy is English** (`Health`, `FILTH`, enemy `DisplayName`). Docs/comments may stay Russian.
 ## CI (GitHub Actions)
 
 Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
@@ -177,7 +177,8 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 2.2 Скверна | Шкала, бафф, перегрузка | Готово |
 | 2.3 Канон-враг | Ихор-зверь + Пепельный ходок, телеграф, роли, тинт | Готово |
 | 2.4 Локация | Sketchfab-арт маршрута, кьяроскуро, пропы | Готово |
-| 2.5–2.7 | UI среза, звук, критерий «5 минут атмосферы» | **Сейчас** |
+| 2.5 UI среза | SliceHud (Health/FILTH), nameplates, fog/grading | Готово |
+| 2.6–2.7 | Звук, критерий «5 минут атмосферы» | **Сейчас** |
 
 Песочница Core Loop: `Scenes/TestWorld.tscn` (не main).
 

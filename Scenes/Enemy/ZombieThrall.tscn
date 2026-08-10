@@ -1,10 +1,11 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Enemy/BasicEnemy.cs" id="1_enemy"]
 [ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
 [ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="3_hitbox"]
 [ext_resource type="Script" path="res://Scripts/Enemy/EnemyAnimDriver.cs" id="4_anim"]
 [ext_resource type="PackedScene" path="res://Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall.glb" id="5_model"]
+[ext_resource type="Script" path="res://Scripts/UI/EnemyNameplate.cs" id="6_plate"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.42
@@ -26,7 +27,7 @@ size = Vector3(0.85, 0.7, 0.9)
 collision_layer = 4
 collision_mask = 1
 script = ExtResource("1_enemy")
-DisplayName = "Пепельный ходок"
+DisplayName = "Ash Walker"
 MoveSpeed = 1.4
 DetectRange = 11.0
 AttackRange = 1.4
@@ -57,6 +58,11 @@ StaggerClip = "stagger"
 DeathClip = "death"
 AttackHitNormStart = 0.45
 AttackHitNormEnd = 0.72
+
+[node name="Nameplate" type="Node3D" parent="."]
+script = ExtResource("6_plate")
+Title = "Ash Walker"
+HeightOffset = 1.95
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
