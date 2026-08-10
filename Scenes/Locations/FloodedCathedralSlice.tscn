@@ -4,14 +4,14 @@
 [ext_resource type="Script" uid="uid://c4s8spnl471xo" path="res://Scripts/Camera/FollowCamera.cs" id="2_camera"]
 [ext_resource type="PackedScene" path="res://Scenes/Enemy/MutantBrute.tscn" id="3_enemy_mutant"]
 [ext_resource type="PackedScene" path="res://Scenes/Enemy/ZombieThrall.tscn" id="3_enemy_zombie"]
-[ext_resource type="Script" uid="uid://c6dj15pp7wov4" path="res://Scripts/UI/DebugHud.cs" id="4_hud"]
+[ext_resource type="Script" uid="uid://bs74dwg6oiuav" path="res://Scripts/UI/SliceHud.cs" id="4_hud"]
 [ext_resource type="Script" uid="uid://w6kekkc2q3ah" path="res://Scripts/Enemy/EnemySpawner.cs" id="5_spawner"]
 [ext_resource type="Script" uid="uid://r1wdfs5o352g" path="res://Scripts/Camera/CameraOcclusionFader.cs" id="6_fader"]
 [ext_resource type="Script" uid="uid://kndyyu0xvjmt" path="res://Scripts/World/SliceAtmosphere.cs" id="7_atmosphere"]
 [ext_resource type="Script" uid="uid://bqoafblabre3d" path="res://Scripts/World/BlightAltar.cs" id="8_altar"]
 [ext_resource type="PackedScene" uid="uid://cnnuljpf4a5v4" path="res://Assets/ThirdParty/CathedralSlice/Processed/CathedralSliceArt.glb" id="9_art"]
 [ext_resource type="Script" uid="uid://jw8wj06lf45x" path="res://Scripts/World/CathedralArtCollision.cs" id="10_art_col"]
-[ext_resource type="Script" path="res://Scripts/World/CathedralArtVariation.cs" id="11_art_var"]
+[ext_resource type="Script" uid="uid://cjixgxtkgq1kf" path="res://Scripts/World/CathedralArtVariation.cs" id="11_art_var"]
 
 [sub_resource type="Environment" id="Environment_slice"]
 background_mode = 1
@@ -26,6 +26,20 @@ glow_enabled = true
 glow_intensity = 0.48
 glow_strength = 0.95
 glow_bloom = 0.22
+fog_enabled = true
+fog_mode = 1
+fog_light_color = Color(0.12, 0.1, 0.11, 1)
+fog_light_energy = 0.62
+fog_density = 0.036
+fog_aerial_perspective = 0.55
+fog_sky_affect = 0.45
+fog_depth_curve = 0.7
+fog_depth_begin = 4.5
+fog_depth_end = 36.0
+adjustment_enabled = true
+adjustment_brightness = 0.98
+adjustment_contrast = 1.08
+adjustment_saturation = 0.82
 
 [sub_resource type="BoxMesh" id="Mesh_floor"]
 size = Vector3(12, 0.2, 36)
@@ -78,52 +92,97 @@ size = Vector3(2.8, 1.2, 1.8)
 [sub_resource type="BoxMesh" id="Mesh_niche"]
 size = Vector3(0.6, 2.2, 2.4)
 
+[sub_resource type="PlaneMesh" id="Mesh_blood_pool_a"]
+size = Vector2(3.8, 3.25)
+
+[sub_resource type="StandardMaterial3D" id="Mat_blood_pool"]
+transparency = 1
+cull_mode = 2
+albedo_color = Color(0.55, 0.04, 0.07, 1)
+metallic = 0.35
+roughness = 0.15
+emission_enabled = true
+emission = Color(0.7, 0.06, 0.1, 1)
+emission_energy_multiplier = 0.95
+
 [sub_resource type="CylinderMesh" id="Mesh_puddle_body"]
-top_radius = 1.15
-bottom_radius = 1.25
-height = 0.14
-radial_segments = 24
-rings = 1
-
-[sub_resource type="CylinderMesh" id="Mesh_puddle_surface"]
-top_radius = 1.28
-bottom_radius = 1.28
-height = 0.03
-radial_segments = 24
-rings = 1
-
-[sub_resource type="CylinderMesh" id="Mesh_puddle_core"]
-top_radius = 0.55
-bottom_radius = 0.62
-height = 0.1
-radial_segments = 16
+top_radius = 1.35
+bottom_radius = 1.35
+height = 0.04
+radial_segments = 28
 rings = 1
 
 [sub_resource type="StandardMaterial3D" id="Mat_ichor"]
 transparency = 1
-albedo_color = Color(0.42, 0.05, 0.08, 0.92)
-metallic = 0.35
-roughness = 0.22
+cull_mode = 2
+albedo_color = Color(0.38, 0.03, 0.05, 0.9)
+metallic = 0.18
+roughness = 0.32
 emission_enabled = true
-emission = Color(0.55, 0.06, 0.1, 1)
-emission_energy_multiplier = 1.15
+emission = Color(0.5, 0.05, 0.08, 1)
+emission_energy_multiplier = 0.85
+
+[sub_resource type="CylinderMesh" id="Mesh_puddle_surface"]
+top_radius = 1.55
+bottom_radius = 1.55
+height = 0.02
+radial_segments = 28
+rings = 1
 
 [sub_resource type="StandardMaterial3D" id="Mat_ichor_surface"]
 transparency = 1
-albedo_color = Color(0.55, 0.08, 0.12, 0.55)
-metallic = 0.55
-roughness = 0.12
+cull_mode = 2
+albedo_color = Color(0.55, 0.06, 0.09, 0.72)
+metallic = 0.35
+roughness = 0.18
 emission_enabled = true
-emission = Color(0.75, 0.1, 0.14, 1)
-emission_energy_multiplier = 1.8
+emission = Color(0.7, 0.08, 0.12, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_puddle_core"]
+top_radius = 0.7
+bottom_radius = 0.7
+height = 0.03
+radial_segments = 20
+rings = 1
 
 [sub_resource type="StandardMaterial3D" id="Mat_ichor_core"]
-albedo_color = Color(0.22, 0.02, 0.04, 1)
-metallic = 0.15
-roughness = 0.45
+transparency = 1
+cull_mode = 2
+albedo_color = Color(0.5, 0.04, 0.07, 0.85)
+metallic = 0.18
+roughness = 0.32
 emission_enabled = true
-emission = Color(0.9, 0.12, 0.16, 1)
-emission_energy_multiplier = 2.4
+emission = Color(0.72, 0.08, 0.12, 1)
+emission_energy_multiplier = 1.35
+
+[sub_resource type="CylinderMesh" id="Mesh_puddle_mist"]
+top_radius = 1.05
+bottom_radius = 1.15
+height = 0.55
+radial_segments = 16
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_ichor_mist"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.32, 0.05, 0.08, 0.12)
+
+[sub_resource type="SphereMesh" id="Mesh_puddle_haze"]
+radius = 1.7
+height = 1.35
+radial_segments = 24
+rings = 14
+is_hemisphere = true
+
+[sub_resource type="StandardMaterial3D" id="Mat_ichor_haze"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(0.28, 0.04, 0.07, 0.08)
+
+[sub_resource type="PlaneMesh" id="Mesh_blood_pool_b"]
+size = Vector2(3.45, 4)
 
 [sub_resource type="PlaneMesh" id="Mesh_wet_stain"]
 size = Vector2(2.4, 1.6)
@@ -195,25 +254,25 @@ spot_attenuation = 0.85
 spot_angle = 24.0
 
 [node name="IchorGlowA" type="OmniLight3D" parent="Lighting" unique_id=2011591970 groups=["ichor_glow"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0.45, 4)
-light_color = Color(0.55, 0.08, 0.12, 1)
-light_energy = 2.4
-omni_range = 5.5
-omni_attenuation = 1.05
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.2, 0.55, 4)
+light_color = Color(0.45, 0.07, 0.1, 1)
+light_energy = 2.2
+omni_range = 6.2
+omni_attenuation = 1.1
 
 [node name="IchorGlowB" type="OmniLight3D" parent="Lighting" unique_id=1547716577 groups=["ichor_glow"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0.45, -7.5)
-light_color = Color(0.55, 0.08, 0.12, 1)
-light_energy = 2.2
-omni_range = 5.0
-omni_attenuation = 1.05
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0.55, -7.5)
+light_color = Color(0.45, 0.07, 0.1, 1)
+light_energy = 2.0
+omni_range = 5.8
+omni_attenuation = 1.1
 
 [node name="AltarGlow" type="OmniLight3D" parent="Lighting" unique_id=71899643]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, -14.5)
-light_color = Color(0.55, 0.45, 0.28, 1)
-light_energy = 1.1
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, -14.5)
+light_color = Color(0.62, 0.5, 0.3, 1)
+light_energy = 1.15
 omni_range = 5.5
-omni_attenuation = 1.35
+omni_attenuation = 1.2
 
 [node name="Geometry" type="Node3D" parent="." unique_id=1037501728]
 
@@ -224,12 +283,8 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 script = ExtResource("10_art_col")
 ArtRootPath = NodePath("../CathedralArt")
 
-[node name="CathedralArtVariation" type="Node" parent="Geometry"]
+[node name="CathedralArtVariation" type="Node" parent="Geometry" unique_id=1765940052]
 script = ExtResource("11_art_var")
-ArtRootPath = NodePath("../CathedralArt")
-Seed = 2408
-TintJitter = 0.14
-WetTileChance = 0.28
 
 [node name="Floor" type="StaticBody3D" parent="Geometry" unique_id=392979010]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
@@ -400,50 +455,102 @@ mesh = SubResource("Mesh_niche")
 surface_material_override/0 = SubResource("Mat_stone_dark")
 
 [node name="IchorPuddleA" type="Node3D" parent="Geometry" unique_id=1520516918]
-transform = Transform3D(1.55, 0, 0, 0, 1, 0, 0, 0, 1.15, -1.2, 0.07, 4)
+transform = Transform3D(1.55, 0, 0, 0, 1, 0, 0, 0, 1.25, -1.2, 0.06, 4)
 
-[node name="Body" type="MeshInstance3D" parent="Geometry/IchorPuddleA"]
+[node name="BloodPool" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=956336791]
+transform = Transform3D(0.96, 0, 0.28, 0, 1, 0, -0.28, 0, 0.96, 0.05, 0.08, -0.08)
+sorting_offset = 2.0
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("Mesh_blood_pool_a")
+surface_material_override/0 = SubResource("Mat_blood_pool")
+
+[node name="Body" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=694080917]
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_body")
 surface_material_override/0 = SubResource("Mat_ichor")
 
-[node name="Surface" type="MeshInstance3D" parent="Geometry/IchorPuddleA"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
+[node name="Surface" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=2113620835]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_surface")
 surface_material_override/0 = SubResource("Mat_ichor_surface")
 
-[node name="Core" type="MeshInstance3D" parent="Geometry/IchorPuddleA"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.04, -0.1)
+[node name="Core" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=1576213784]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.03, -0.08)
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_core")
 surface_material_override/0 = SubResource("Mat_ichor_core")
+
+[node name="Mist" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=817520685]
+transform = Transform3D(0.85, 0, 0, 0, 0.6, 0, 0, 0, 0.85, 0, 0.02, 0)
+cast_shadow = 0
+mesh = SubResource("Mesh_puddle_mist")
+surface_material_override/0 = SubResource("Mat_ichor_mist")
+
+[node name="Haze" type="MeshInstance3D" parent="Geometry/IchorPuddleA" unique_id=1523791020]
+transform = Transform3D(0.92, 0, 0, 0, 0.36, 0, 0, 0, 0.92, 0.06, 0.02, 0.03)
+cast_shadow = 0
+mesh = SubResource("Mesh_puddle_haze")
+surface_material_override/0 = SubResource("Mat_ichor_haze")
 
 [node name="IchorPuddleB" type="Node3D" parent="Geometry" unique_id=435239067]
-transform = Transform3D(1.25, 0, 0.72, 0, 1, 0, -0.72, 0, 1.25, 1.6, 0.07, -7.5)
+transform = Transform3D(1.3, 0, 0.75, 0, 1, 0, -0.75, 0, 1.3, 1.6, 0.06, -7.5)
 
-[node name="Body" type="MeshInstance3D" parent="Geometry/IchorPuddleB"]
+[node name="BloodPool" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=110542902]
+transform = Transform3D(0.9, 0, -0.42, 0, 1, 0, 0.42, 0, 0.9, -0.1, 0.08, 0.12)
+sorting_offset = 2.0
+cast_shadow = 0
+gi_mode = 0
+mesh = SubResource("Mesh_blood_pool_b")
+surface_material_override/0 = SubResource("Mat_blood_pool")
+
+[node name="Body" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=1548712813]
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_body")
 surface_material_override/0 = SubResource("Mat_ichor")
 
-[node name="Surface" type="MeshInstance3D" parent="Geometry/IchorPuddleB"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
+[node name="Surface" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=1968071538]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.025, 0)
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_surface")
 surface_material_override/0 = SubResource("Mat_ichor_surface")
 
-[node name="Core" type="MeshInstance3D" parent="Geometry/IchorPuddleB"]
-transform = Transform3D(1.1, 0, 0, 0, 1, 0, 0, 0, 0.9, -0.2, 0.04, 0.15)
+[node name="Core" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=1969127951]
+transform = Transform3D(1.05, 0, 0, 0, 1, 0, 0, 0, 0.95, -0.15, 0.03, 0.1)
+visible = false
+cast_shadow = 0
 mesh = SubResource("Mesh_puddle_core")
 surface_material_override/0 = SubResource("Mat_ichor_core")
 
-[node name="WetStainA" type="MeshInstance3D" parent="Geometry"]
+[node name="Mist" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=690310928]
+transform = Transform3D(0.8, 0, 0, 0, 0.55, 0, 0, 0, 0.8, 0, 0.02, 0)
+cast_shadow = 0
+mesh = SubResource("Mesh_puddle_mist")
+surface_material_override/0 = SubResource("Mat_ichor_mist")
+
+[node name="Haze" type="MeshInstance3D" parent="Geometry/IchorPuddleB" unique_id=1161869729]
+transform = Transform3D(0.88, 0, 0, 0, 0.34, 0, 0, 0, 0.88, -0.05, 0.02, -0.03)
+cast_shadow = 0
+mesh = SubResource("Mesh_puddle_haze")
+surface_material_override/0 = SubResource("Mat_ichor_haze")
+
+[node name="WetStainA" type="MeshInstance3D" parent="Geometry" unique_id=1357375420]
 transform = Transform3D(1.2, 0, 0.4, 0, 1, 0, -0.4, 0, 1.2, 2.2, 0.03, 8.5)
 mesh = SubResource("Mesh_wet_stain")
 surface_material_override/0 = SubResource("Mat_wet_stain")
 
-[node name="WetStainB" type="MeshInstance3D" parent="Geometry"]
-transform = Transform3D(0.85, 0, -0.55, 0, 1, 0, 0.55, 0, 0.85, -2.4, 0.03, -2.0)
+[node name="WetStainB" type="MeshInstance3D" parent="Geometry" unique_id=758649158]
+transform = Transform3D(0.85, 0, -0.55, 0, 1, 0, 0.55, 0, 0.85, -2.4, 0.03, -2)
 mesh = SubResource("Mesh_wet_stain")
 surface_material_override/0 = SubResource("Mat_wet_stain")
 
-[node name="WetStainC" type="MeshInstance3D" parent="Geometry"]
+[node name="WetStainC" type="MeshInstance3D" parent="Geometry" unique_id=263296904]
 transform = Transform3D(1.4, 0, 0.1, 0, 1, 0, -0.1, 0, 0.9, 0.6, 0.03, -11.5)
 mesh = SubResource("Mesh_wet_stain")
 surface_material_override/0 = SubResource("Mat_wet_stain")
@@ -466,13 +573,14 @@ surface_material_override/0 = SubResource("Mat_altar")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/AltarStub" unique_id=1720816338]
 shape = SubResource("Shape_altar")
 
-[node name="BlightAltar" type="Area3D" parent="Geometry/AltarStub" unique_id=1799456079 node_paths=PackedStringArray("VisualMesh")]
+[node name="BlightAltar" type="Area3D" parent="Geometry/AltarStub" unique_id=1799456079 node_paths=PackedStringArray("AltarLight")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.8)
 collision_layer = 0
 collision_mask = 2
 monitorable = false
 script = ExtResource("8_altar")
-VisualMesh = NodePath("../MeshInstance3D")
+AltarLight = NodePath("../../../Lighting/AltarGlow")
+ArtRootPath = NodePath("../../CathedralArt")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Geometry/AltarStub/BlightAltar" unique_id=15638508]
 shape = SubResource("Shape_altar_cleanse")
@@ -499,7 +607,7 @@ RespawnDelay = 5.0
 script = ExtResource("2_camera")
 Target = NodePath("../Player")
 Offset = Vector3(0, 5.5, 5)
-SmoothSpeed = 6.5
+SmoothSpeed = 2.5
 LookAtOffset = Vector3(0, 1.15, 0)
 
 [node name="Camera3D" type="Camera3D" parent="FollowCamera" unique_id=1277467927]
@@ -512,8 +620,7 @@ far = 140.0
 script = ExtResource("6_fader")
 Target = NodePath("../../Player")
 Camera = NodePath("../Camera3D")
-FadeTransparency = 0.88
 FadeLerpSpeed = 14.0
 
-[node name="DebugHud" type="CanvasLayer" parent="." unique_id=568899075]
+[node name="SliceHud" type="CanvasLayer" parent="." unique_id=568899075]
 script = ExtResource("4_hud")
