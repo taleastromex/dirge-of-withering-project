@@ -5,15 +5,15 @@ namespace DirgeOfWithering;
 /// <summary>
 /// Ближний удар к курсору:
 /// ЛКМ — обычный; RMB — тяжёлый (телеграф, больше урон/knockback, +Скверна).
+/// Хитбокс синхронизирован с окном клипа в PlayerAnimDriver.
 /// </summary>
 public partial class PlayerAttack : Node
 {
 	private enum AttackPhase
 	{
 		Idle,
-		Windup,
-		Active,
-		Cooldown
+		Swing,
+		Recovery
 	}
 
 	[Export]
@@ -26,13 +26,24 @@ public partial class PlayerAttack : Node
 	public BlightController? BlightController { get; set; }
 
 	[Export]
-	public float WindupTime { get; set; } = 0.1f;
+	public PlayerAnimDriver? AnimDriver { get; set; }
+
+	/// <summary>Запас, если клип ещё не готов (сек).</summary>
+	[Export]
+	public float AttackFallbackDuration { get; set; } = 1.2f;
 
 	[Export]
-	public float ActiveTime { get; set; } = 0.12f;
+	public float HeavyAttackFallbackDuration { get; set; } = 2.0f;
 
 	[Export]
-	public float CooldownTime { get; set; } = 0.42f;
+	public float RecoveryTime { get; set; } = 0.12f;
+
+	[Export]
+	public float HeavyRecoveryTime { get; set; } = 0.18f;
+
+	/// <summary>Когда показать телеграф heavy (доля клипа), до окна урона.</summary>
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float HeavyTelegraphNormStart { get; set; } = 0.45f;
 
 	[Export]
 	public int Damage { get; set; } = 28;
@@ -42,15 +53,6 @@ public partial class PlayerAttack : Node
 
 	[Export]
 	public float HitStopSeconds { get; set; } = 0.055f;
-
-	[Export]
-	public float HeavyWindupTime { get; set; } = 0.22f;
-
-	[Export]
-	public float HeavyActiveTime { get; set; } = 0.16f;
-
-	[Export]
-	public float HeavyCooldownTime { get; set; } = 0.55f;
 
 	[Export]
 	public int HeavyDamage { get; set; } = 56;
@@ -67,20 +69,22 @@ public partial class PlayerAttack : Node
 	private AttackPhase _phase = AttackPhase.Idle;
 	private float _phaseTimer;
 	private bool _heavySwing;
+	private bool _hitboxWasActive;
 	private Vector3 _hitboxBaseScale = Vector3.One;
 	private StandardMaterial3D? _telegraphMaterial;
 	private Color _defaultDebugColor = new(0.9f, 0.2f, 0.25f, 0.35f);
 	private Color _heavyTelegraphColor = new(0.95f, 0.55f, 0.12f, 0.5f);
 
-	public bool IsAttacking => _phase is AttackPhase.Windup or AttackPhase.Active;
+	public bool IsAttacking => _phase is AttackPhase.Swing;
 
-	public bool LocksMovement => _phase is AttackPhase.Windup or AttackPhase.Active;
+	public bool LocksMovement => _phase is AttackPhase.Swing;
 
 	public override void _Ready()
 	{
 		Hitbox ??= GetNodeOrNull<Hitbox3D>("../Visual/Hitbox");
 		Health ??= GetNodeOrNull<Health>("../Health");
 		BlightController ??= GetNodeOrNull<BlightController>("../BlightController");
+		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
 
 		if (Hitbox != null)
 		{
@@ -108,79 +112,121 @@ public partial class PlayerAttack : Node
 			case AttackPhase.Idle:
 				if (Input.IsActionJustPressed("heavy_attack"))
 				{
-					BeginWindup(heavy: true);
+					BeginSwing(heavy: true);
 				}
 				else if (Input.IsActionJustPressed("attack"))
 				{
-					BeginWindup(heavy: false);
+					BeginSwing(heavy: false);
 				}
 				break;
 
-			case AttackPhase.Windup:
+			case AttackPhase.Swing:
+				UpdateHeavyTelegraph();
+				UpdateAttackHitbox();
 				_phaseTimer -= dt;
-				if (_phaseTimer <= 0f)
+				if (_phaseTimer <= 0f || (AnimDriver?.IsAttackFinished() ?? false))
 				{
-					BeginActive();
+					BeginRecovery();
 				}
 				break;
 
-			case AttackPhase.Active:
-				_phaseTimer -= dt;
-				if (_phaseTimer <= 0f)
-				{
-					BeginCooldown();
-				}
-				break;
-
-			case AttackPhase.Cooldown:
+			case AttackPhase.Recovery:
 				_phaseTimer -= dt;
 				if (_phaseTimer <= 0f)
 				{
 					_phase = AttackPhase.Idle;
 					_heavySwing = false;
+					AnimDriver?.NotifyAttackFinished();
 					ResetHitboxVisual();
 				}
 				break;
 		}
 	}
 
-	private void BeginWindup(bool heavy)
+	private void BeginSwing(bool heavy)
 	{
 		_heavySwing = heavy;
-		_phase = AttackPhase.Windup;
-		_phaseTimer = heavy ? HeavyWindupTime : WindupTime;
+		_phase = AttackPhase.Swing;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
+		ApplyHitboxTuning(heavy);
+		AnimDriver?.PlayAttack(heavy);
+
+		float len = AnimDriver?.GetCurrentLength() ?? 0f;
+		float fallback = heavy ? HeavyAttackFallbackDuration : AttackFallbackDuration;
+		_phaseTimer = len > 0.05f ? len : fallback;
 
 		if (heavy)
 		{
 			BlightController?.NotifyHeavyAttackUsed();
+		}
+
+		SetTelegraphVisible(false);
+		ResetHitboxVisual();
+	}
+
+	private void UpdateHeavyTelegraph()
+	{
+		if (!_heavySwing || Hitbox == null || AnimDriver == null || _hitboxWasActive)
+		{
+			return;
+		}
+
+		float len = AnimDriver.GetCurrentLength();
+		if (len <= 0.01f)
+		{
+			return;
+		}
+
+		float t = AnimDriver.GetCurrentPosition() / len;
+		bool show = t >= HeavyTelegraphNormStart && t < AnimDriver.HeavyAttackHitNormStart;
+		if (show)
+		{
 			ShowHeavyTelegraph();
 		}
-		else
+		else if (t < HeavyTelegraphNormStart)
 		{
 			SetTelegraphVisible(false);
 			ResetHitboxVisual();
 		}
 	}
 
-	private void BeginActive()
+	private void UpdateAttackHitbox()
 	{
-		_phase = AttackPhase.Active;
-		_phaseTimer = _heavySwing ? HeavyActiveTime : ActiveTime;
-		ApplyHitboxTuning(_heavySwing);
-		Hitbox?.SetActive(true);
-
-		// Во время active оставляем увеличенный хитбокс для heavy, цвет — ударный.
-		if (_heavySwing)
+		if (Hitbox == null || AnimDriver == null)
 		{
-			SetTelegraphColor(_defaultDebugColor);
+			return;
 		}
+
+		bool shouldHit = AnimDriver.IsAttackHitWindow();
+		if (shouldHit == _hitboxWasActive)
+		{
+			return;
+		}
+
+		if (shouldHit)
+		{
+			ApplyHitboxTuning(_heavySwing);
+			if (_heavySwing)
+			{
+				SetTelegraphColor(_defaultDebugColor);
+			}
+		}
+		else if (_heavySwing && _hitboxWasActive)
+		{
+			SetTelegraphVisible(false);
+			ResetHitboxVisual();
+		}
+
+		Hitbox.SetActive(shouldHit);
+		_hitboxWasActive = shouldHit;
 	}
 
-	private void BeginCooldown()
+	private void BeginRecovery()
 	{
-		_phase = AttackPhase.Cooldown;
-		_phaseTimer = _heavySwing ? HeavyCooldownTime : CooldownTime;
+		_phase = AttackPhase.Recovery;
+		_phaseTimer = _heavySwing ? HeavyRecoveryTime : RecoveryTime;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		SetTelegraphVisible(false);
 		ResetHitboxVisual();
@@ -191,9 +237,11 @@ public partial class PlayerAttack : Node
 		_phase = AttackPhase.Idle;
 		_phaseTimer = 0f;
 		_heavySwing = false;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		SetTelegraphVisible(false);
 		ResetHitboxVisual();
+		AnimDriver?.NotifyAttackFinished();
 	}
 
 	private void ApplyHitboxTuning(bool heavy)

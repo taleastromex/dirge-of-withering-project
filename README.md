@@ -65,34 +65,39 @@ Input Map: `move_up/down/left/right`, `attack`, `heavy_attack`.
 Scripts/
   Camera/FollowCamera.cs
   Combat/                     # Health, Hitbox3D, hit-stop, layers
-  Player/                     # move / aim / attack
+  Player/                     # move / aim / attack / PlayerAnimDriver
   Enemy/                      # BasicEnemy, EnemyAnimDriver, EnemySpawner
   World/ErrengardPalette.cs   # палитра среза (пепел / багровый / жёлтый)
   UI/DebugHud.cs
 Scenes/
   Locations/FloodedCathedralSlice.tscn   # main scene (Vertical Slice)
   TestWorld.tscn                         # песочница Core Loop
-  Player/Player.tscn
+  Player/Player.tscn                     # Blood Knight (Mixamo)
   Enemy/MutantBrute.tscn                 # Mixamo mutant
   Enemy/ZombieThrall.tscn                # Mixamo zombie (Ch10)
   Enemy/BasicEnemy.tscn                  # capsule fallback
-Assets/ThirdParty/BlightedWretch/        # Processed/*.glb — CREDITS.md
+Assets/ThirdParty/BloodKnight/           # player glb — CREDITS.md
+Assets/ThirdParty/BlightedWretch/        # NPC glb — CREDITS.md
+Assets/ThirdParty/CathedralSlice/        # локация: Processed/CathedralSliceArt.glb — CREDITS.md
+Tools/build_cathedral_slice_art.py       # Blender: сборка арта локации
+Tools/merge_mixamo_anims.py              # Mixamo FBX → GLB (mutant/zombie/blood_knight)
+Tools/prepare_cathedral_slice_assets.sh  # распаковка Source → kits
 CONCEPT.md
 ```
 
 ## Архитектура геймплея
 
-**Сейчас:** этап **2.3** закрыт по канон-врагам.  
-Два архетипа на срезе:
+**Сейчас:** этап **2.4** — арт маршрута на Sketchfab-мешах.  
+Маршрут: вход → неф (Ихор-зверь) → апсида (Пепельный ходок) → алтарь очищения.  
+Визуал: `CathedralSliceArt.glb`; коллизии — прежние `StaticBody3D` в сцене.
 
 | Роль | Сцена | Имя в HUD | Характер |
 |------|-------|-----------|----------|
-| Давление | `MutantBrute` (неф) | Ихор-зверь | Быстрый, больший урон, меньше HP |
-| Блокер | `ZombieThrall` (апсида) | Пепельный ходок | Медленный, толстый, короткий хитбокс |
+| Давление | `MutantBrute` (неф) | Ихор-зверь | Быстрый, больший урон |
+| Блокер | `ZombieThrall` (апсида) | Пепельный ходок | Медленный, толстый |
 
-Бой: телеграф (рык/крик) → удар с окном хитбокса по клипу → recovery; death держит позу ~3 с.  
-Пепельный `AshTint` на материалах; HUD показывает ближайшего врага по `DisplayName`.  
-Скверна (2.2) на месте.
+Бой: телеграф → окно хитбокса → recovery; death держит позу.  
+Скверна (2.2) + алтарь-заглушка на месте.
 
 ```
 Player (CharacterBody3D)
@@ -171,7 +176,8 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 2.1 Каркас среза | Локация «Затопленный собор», палитра, Core Loop на месте | Готово |
 | 2.2 Скверна | Шкала, бафф, перегрузка | Готово |
 | 2.3 Канон-враг | Ихор-зверь + Пепельный ходок, телеграф, роли, тинт | Готово |
-| 2.4–2.7 | Арт маршрута, UI, звук, критерий «5 минут атмосферы» | **Сейчас** |
+| 2.4 Локация | Sketchfab-арт маршрута, кьяроскуро, пропы | Готово |
+| 2.5–2.7 | UI среза, звук, критерий «5 минут атмосферы» | **Сейчас** |
 
 Песочница Core Loop: `Scenes/TestWorld.tscn` (не main).
 
