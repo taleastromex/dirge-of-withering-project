@@ -1,10 +1,10 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Примитивный враг Core Loop: детект → подход → телеграф → удар.
-/// Есть stagger от урона и knockback.
+/// Базовый враг: детект → подход → телеграф → удар → recovery.
 /// </summary>
 public partial class BasicEnemy : CharacterBody3D
 {
@@ -20,6 +20,9 @@ public partial class BasicEnemy : CharacterBody3D
 	}
 
 	[Export]
+	public string DisplayName { get; set; } = "Враг";
+
+	[Export]
 	public float MoveSpeed { get; set; } = 3.35f;
 
 	[Export]
@@ -29,16 +32,14 @@ public partial class BasicEnemy : CharacterBody3D
 	public float AttackRange { get; set; } = 1.55f;
 
 	[Export]
-	public float TelegraphTime { get; set; } = 0.45f;
+	public float TelegraphTime { get; set; } = 0.4f;
+
+	/// <summary>Пауза после анимации удара, пока хитбокс выключен.</summary>
+	[Export]
+	public float RecoveryTime { get; set; } = 0.45f;
 
 	[Export]
-	public float AttackActiveTime { get; set; } = 0.14f;
-
-	[Export]
-	public float RecoveryTime { get; set; } = 0.6f;
-
-	[Export]
-	public float StaggerTime { get; set; } = 0.28f;
+	public float StaggerTime { get; set; } = 0.35f;
 
 	[Export]
 	public int AttackDamage { get; set; } = 20;
@@ -53,7 +54,7 @@ public partial class BasicEnemy : CharacterBody3D
 	public float KnockbackDuration { get; set; } = 0.14f;
 
 	[Export]
-	public float DeathDespawnDelay { get; set; } = 0.55f;
+	public float DeathDespawnDelay { get; set; } = 3.0f;
 
 	/// <summary>Множитель скорости, если у игрока HIGH/OVERLOAD Скверна.</summary>
 	[Export]
@@ -61,7 +62,19 @@ public partial class BasicEnemy : CharacterBody3D
 
 	/// <summary>Множитель длительности телеграфа при HIGH Скверне игрока (&lt; 1 = быстрее).</summary>
 	[Export]
-	public float HighBlightTelegraphMul { get; set; } = 0.72f;
+	public float HighBlightTelegraphMul { get; set; } = 0.75f;
+
+	/// <summary>Запас, если AnimationPlayer ещё не отдал длину клипа.</summary>
+	[Export]
+	public float AttackFallbackDuration { get; set; } = 1.1f;
+
+	/// <summary>Скорость поворота Visual к цели (выше = резче).</summary>
+	[Export]
+	public float FaceTurnSpeed { get; set; } = 7f;
+
+	/// <summary>Пепельно-багровый тинт под палитру собора (умножается на albedo).</summary>
+	[Export]
+	public Color AshTint { get; set; } = new(0.82f, 0.74f, 0.7f, 1f);
 
 	[Export]
 	public Health? Health { get; set; }
@@ -75,16 +88,29 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public MeshInstance3D? BodyMesh { get; set; }
 
+	[Export]
+	public EnemyAnimDriver? AnimDriver { get; set; }
+
 	private AiState _state = AiState.Idle;
 	private float _stateTimer;
 	private Node3D? _player;
-	private StandardMaterial3D? _bodyMaterial;
-	private Color _baseColor = new(0.35f, 0.4f, 0.28f, 1f);
-	private Color _telegraphColor = new(0.85f, 0.25f, 0.15f, 1f);
-	private Color _staggerColor = new(0.75f, 0.7f, 0.45f, 1f);
+	private readonly List<BaseMaterial3D> _tintedMaterials = new();
+	private readonly List<Color> _baseAlbedos = new();
 
 	private Vector3 _knockbackVelocity;
 	private float _knockbackTimer;
+	private bool _hitboxWasActive;
+	private bool _deathSettling;
+	private float _deathGroundOffsetApplied;
+	private Skeleton3D? _deathSkeleton;
+
+	/// <summary>Скорость опускания трупа к полу (м/с), если death без root motion по Y.</summary>
+	[Export]
+	public float DeathSettleSpeed { get; set; } = 4.5f;
+
+	/// <summary>Зазор кости/пола, при котором труп считаем приземлённым в этом кадре.</summary>
+	[Export]
+	public float DeathFloorClearance { get; set; } = 0.04f;
 
 	public override void _Ready()
 	{
@@ -94,6 +120,7 @@ public partial class BasicEnemy : CharacterBody3D
 		Hitbox ??= GetNodeOrNull<Hitbox3D>("Visual/Hitbox");
 		Visual ??= GetNodeOrNull<Node3D>("Visual");
 		BodyMesh ??= GetNodeOrNull<MeshInstance3D>("Visual/Body");
+		AnimDriver ??= GetNodeOrNull<EnemyAnimDriver>("AnimDriver");
 
 		if (Hitbox != null)
 		{
@@ -102,8 +129,7 @@ public partial class BasicEnemy : CharacterBody3D
 			Hitbox.SetActive(false);
 		}
 
-		// Материал из .tscn общий на все инстансы — дублируем, иначе stagger/телеграф красит всех.
-		EnsureUniqueBodyMaterial();
+		ApplyAshTintToMeshes();
 
 		if (Health != null)
 		{
@@ -112,17 +138,24 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		CallDeferred(MethodName.EnterIdle);
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
+		float dt = (float)delta;
+
 		if (_state == AiState.Dead)
 		{
+			if (_deathSettling)
+			{
+				SettleCorpseToGround(dt);
+			}
+
 			return;
 		}
 
 		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
-		float dt = (float)delta;
 
 		if (_knockbackTimer > 0f)
 		{
@@ -136,8 +169,8 @@ public partial class BasicEnemy : CharacterBody3D
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f && _knockbackTimer <= 0f)
 				{
-					SetBodyColor(_baseColor);
-					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
+					RestoreTint();
+					ResumeAfterInterrupt();
 				}
 			}
 
@@ -150,21 +183,20 @@ public partial class BasicEnemy : CharacterBody3D
 				Velocity = new Vector3(0f, Velocity.Y, 0f);
 				if (IsPlayerInRange(DetectRange))
 				{
-					_state = AiState.Chase;
+					EnterChase();
 				}
 				break;
 
 			case AiState.Chase:
 				if (_player == null || !IsPlayerAlive())
 				{
-					_state = AiState.Idle;
+					EnterIdle();
 					break;
 				}
 
 				if (!IsPlayerInRange(DetectRange * 1.25f))
 				{
-					_state = AiState.Idle;
-					Velocity = new Vector3(0f, Velocity.Y, 0f);
+					EnterIdle();
 					break;
 				}
 
@@ -174,12 +206,12 @@ public partial class BasicEnemy : CharacterBody3D
 					break;
 				}
 
-				ChasePlayer();
+				ChasePlayer(dt);
 				break;
 
 			case AiState.Telegraph:
 				Velocity = new Vector3(0f, Velocity.Y, 0f);
-				FacePlayer();
+				FacePlayer(dt);
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f)
 				{
@@ -189,8 +221,10 @@ public partial class BasicEnemy : CharacterBody3D
 
 			case AiState.Attack:
 				Velocity = new Vector3(0f, Velocity.Y, 0f);
+				FacePlayer(dt * 0.35f);
+				UpdateAttackHitbox();
 				_stateTimer -= dt;
-				if (_stateTimer <= 0f)
+				if (_stateTimer <= 0f || (AnimDriver?.IsAttackFinished() ?? false))
 				{
 					BeginRecovery();
 				}
@@ -201,8 +235,8 @@ public partial class BasicEnemy : CharacterBody3D
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f)
 				{
-					SetBodyColor(_baseColor);
-					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
+					RestoreTint();
+					ResumeAfterInterrupt();
 				}
 				break;
 
@@ -211,8 +245,8 @@ public partial class BasicEnemy : CharacterBody3D
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f)
 				{
-					SetBodyColor(_baseColor);
-					_state = IsPlayerInRange(DetectRange) ? AiState.Chase : AiState.Idle;
+					RestoreTint();
+					ResumeAfterInterrupt();
 				}
 				break;
 		}
@@ -238,42 +272,102 @@ public partial class BasicEnemy : CharacterBody3D
 		_knockbackTimer = KnockbackDuration;
 	}
 
+	private void EnterIdle()
+	{
+		_state = AiState.Idle;
+		_hitboxWasActive = false;
+		Hitbox?.SetActive(false);
+		Velocity = new Vector3(0f, Velocity.Y, 0f);
+		AnimDriver?.ResetSpeed();
+		AnimDriver?.PlayIdle();
+	}
+
+	private void EnterChase()
+	{
+		_state = AiState.Chase;
+		_hitboxWasActive = false;
+		Hitbox?.SetActive(false);
+		AnimDriver?.ResetSpeed();
+		AnimDriver?.PlayChase();
+	}
+
 	private void BeginTelegraph()
 	{
 		_state = AiState.Telegraph;
-		float telegraphMul = PlayerHasHighBlight() ? HighBlightTelegraphMul : 1f;
-		_stateTimer = TelegraphTime * telegraphMul;
-		Velocity = new Vector3(0f, Velocity.Y, 0f);
+		float mul = PlayerHasHighBlight() ? HighBlightTelegraphMul : 1f;
+		_stateTimer = TelegraphTime * mul;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
-		SetBodyColor(_telegraphColor);
-		FacePlayer();
+		Velocity = new Vector3(0f, Velocity.Y, 0f);
+		FacePlayer(999f);
+		ApplyTelegraphTint();
+		AnimDriver?.PlayTelegraph();
 	}
 
 	private void BeginAttack()
 	{
 		_state = AiState.Attack;
-		_stateTimer = AttackActiveTime;
-		FacePlayer();
+		_hitboxWasActive = false;
+		Hitbox?.SetActive(false);
+		Velocity = new Vector3(0f, Velocity.Y, 0f);
+		FacePlayer(999f);
 		ApplyHitboxTuning();
-		Hitbox?.SetActive(true);
+		AnimDriver?.PlayAttack();
+
+		float len = AnimDriver?.GetCurrentLength() ?? 0f;
+		_stateTimer = len > 0.05f ? len : AttackFallbackDuration;
+	}
+
+	private void UpdateAttackHitbox()
+	{
+		if (Hitbox == null || AnimDriver == null)
+		{
+			return;
+		}
+
+		bool shouldHit = AnimDriver.IsAttackHitWindow();
+		if (shouldHit == _hitboxWasActive)
+		{
+			return;
+		}
+
+		Hitbox.SetActive(shouldHit);
+		_hitboxWasActive = shouldHit;
 	}
 
 	private void BeginRecovery()
 	{
 		_state = AiState.Recovery;
 		_stateTimer = RecoveryTime;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
+		RestoreTint();
+		AnimDriver?.PlayIdle();
 	}
 
 	private void BeginStagger()
 	{
 		_state = AiState.Stagger;
 		_stateTimer = StaggerTime;
+		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
-		SetBodyColor(_staggerColor);
+		ApplyStaggerTint();
+		AnimDriver?.PlayStagger();
 	}
 
-	private void ChasePlayer()
+	private void ResumeAfterInterrupt()
+	{
+		if (IsPlayerInRange(DetectRange))
+		{
+			EnterChase();
+		}
+		else
+		{
+			EnterIdle();
+		}
+	}
+
+	private void ChasePlayer(float dt)
 	{
 		if (_player == null)
 		{
@@ -291,7 +385,7 @@ public partial class BasicEnemy : CharacterBody3D
 		Vector3 dir = toPlayer.Normalized();
 		float speed = MoveSpeed * (PlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
 		Velocity = new Vector3(dir.X * speed, Velocity.Y, dir.Z * speed);
-		FaceDirection(dir);
+		FaceDirection(dir, dt);
 	}
 
 	private bool PlayerHasHighBlight()
@@ -305,7 +399,7 @@ public partial class BasicEnemy : CharacterBody3D
 		return blight != null && blight.IsHigh;
 	}
 
-	private void FacePlayer()
+	private void FacePlayer(float dt)
 	{
 		if (_player == null)
 		{
@@ -319,19 +413,25 @@ public partial class BasicEnemy : CharacterBody3D
 			return;
 		}
 
-		FaceDirection(toPlayer.Normalized());
+		FaceDirection(toPlayer.Normalized(), dt);
 	}
 
-	private void FaceDirection(Vector3 direction)
+	private void FaceDirection(Vector3 direction, float dt)
 	{
-		if (Visual == null)
+		if (Visual == null || direction.LengthSquared() < 0.0001f)
 		{
 			return;
 		}
 
-		Vector3 lookAt = Visual.GlobalPosition + direction;
-		lookAt.Y = Visual.GlobalPosition.Y;
-		Visual.LookAt(lookAt, Vector3.Up);
+		Transform3D current = Visual.GlobalTransform;
+		Transform3D looking = current.LookingAt(current.Origin + direction, Vector3.Up);
+		Quaternion from = current.Basis.GetRotationQuaternion();
+		Quaternion to = looking.Basis.GetRotationQuaternion();
+		float weight = dt >= 100f
+			? 1f
+			: 1f - Mathf.Exp(-FaceTurnSpeed * Mathf.Max(dt, 0f));
+		Quaternion blended = from.Slerp(to, weight).Normalized();
+		Visual.GlobalTransform = new Transform3D(new Basis(blended), current.Origin);
 	}
 
 	private bool IsPlayerInRange(float range)
@@ -364,32 +464,59 @@ public partial class BasicEnemy : CharacterBody3D
 		return a.DistanceTo(b);
 	}
 
-	private void EnsureUniqueBodyMaterial()
+	private void ApplyAshTintToMeshes()
 	{
-		if (BodyMesh == null)
-		{
-			return;
-		}
-
-		Material? source = BodyMesh.GetActiveMaterial(0) ?? BodyMesh.MaterialOverride;
-		if (source is StandardMaterial3D shared)
-		{
-			_bodyMaterial = (StandardMaterial3D)shared.Duplicate();
-			_baseColor = _bodyMaterial.AlbedoColor;
-		}
-		else
-		{
-			_bodyMaterial = new StandardMaterial3D { AlbedoColor = _baseColor, Roughness = 0.9f };
-		}
-
-		BodyMesh.MaterialOverride = _bodyMaterial;
+		_tintedMaterials.Clear();
+		_baseAlbedos.Clear();
+		ApplyTintRecursive(Visual ?? this);
 	}
 
-	private void SetBodyColor(Color color)
+	private void ApplyTintRecursive(Node node)
 	{
-		if (_bodyMaterial != null)
+		if (node is MeshInstance3D mesh)
 		{
-			_bodyMaterial.AlbedoColor = color;
+			int count = mesh.Mesh?.GetSurfaceCount() ?? 0;
+			for (int i = 0; i < count; i++)
+			{
+				Material? source = mesh.GetActiveMaterial(i);
+				if (source is not BaseMaterial3D)
+				{
+					continue;
+				}
+
+				var dup = (BaseMaterial3D)source.Duplicate();
+				_baseAlbedos.Add(dup.AlbedoColor);
+				dup.AlbedoColor = dup.AlbedoColor * AshTint;
+				_tintedMaterials.Add(dup);
+				mesh.SetSurfaceOverrideMaterial(i, dup);
+			}
+		}
+
+		foreach (Node child in node.GetChildren())
+		{
+			ApplyTintRecursive(child);
+		}
+	}
+
+	private void ApplyTelegraphTint() => SetTintMul(new Color(1.15f, 0.55f, 0.45f, 1f));
+
+	private void ApplyStaggerTint() => SetTintMul(new Color(1.05f, 0.95f, 0.55f, 1f));
+
+	private void RestoreTint()
+	{
+		for (int i = 0; i < _tintedMaterials.Count; i++)
+		{
+			Color baseCol = i < _baseAlbedos.Count ? _baseAlbedos[i] : Colors.White;
+			_tintedMaterials[i].AlbedoColor = baseCol * AshTint;
+		}
+	}
+
+	private void SetTintMul(Color mul)
+	{
+		for (int i = 0; i < _tintedMaterials.Count; i++)
+		{
+			Color baseCol = i < _baseAlbedos.Count ? _baseAlbedos[i] : Colors.White;
+			_tintedMaterials[i].AlbedoColor = baseCol * AshTint * mul;
 		}
 	}
 
@@ -412,7 +539,6 @@ public partial class BasicEnemy : CharacterBody3D
 			return;
 		}
 
-		// Прерываем телеграф/удар — читаемый ответ на попадание.
 		BeginStagger();
 	}
 
@@ -421,17 +547,102 @@ public partial class BasicEnemy : CharacterBody3D
 		_state = AiState.Dead;
 		Velocity = Vector3.Zero;
 		_knockbackTimer = 0f;
+		_hitboxWasActive = false;
+		_deathSettling = true;
+		_deathGroundOffsetApplied = 0f;
 		Hitbox?.SetActive(false);
-		SetBodyColor(new Color(0.15f, 0.12f, 0.12f, 1f));
+		SetTintMul(new Color(0.45f, 0.4f, 0.4f, 1f));
 
 		CollisionLayer = 0;
 		CollisionMask = 0;
 
-		if (Visual != null)
+		if (AnimDriver != null)
+		{
+			AnimDriver.PlayDeath();
+			// Только пауза после доигрывания — без Seek в конец (он рвал анимацию).
+		}
+		else if (Visual != null)
 		{
 			Visual.Visible = false;
+			_deathSettling = false;
 		}
 
 		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
+	}
+
+	/// <summary>
+	/// Death без hips-Y оставляет лежащую позу на высоте стоячих бёдер.
+	/// AABB скин-меша врёт (rest pose) — меряем кости и опускаем Visual каждый кадр,
+	/// пока анимация валит тело (не выключаем settle после первого «на полу»).
+	/// </summary>
+	private void SettleCorpseToGround(float dt)
+	{
+		if (Visual == null)
+		{
+			_deathSettling = false;
+			return;
+		}
+
+		_deathSkeleton ??= FindSkeleton(Visual);
+		float floorY = GlobalPosition.Y + DeathFloorClearance;
+		float bottomY = SampleSkeletonBottomY(_deathSkeleton);
+		if (bottomY >= float.MaxValue * 0.5f)
+		{
+			return;
+		}
+
+		float gap = bottomY - floorY;
+		if (gap <= 0f)
+		{
+			return;
+		}
+
+		float step = Mathf.Min(gap, DeathSettleSpeed * dt);
+		Visual.Position = new Vector3(
+			Visual.Position.X,
+			Visual.Position.Y - step,
+			Visual.Position.Z);
+		_deathGroundOffsetApplied += step;
+	}
+
+	private static Skeleton3D? FindSkeleton(Node node)
+	{
+		if (node is Skeleton3D skel)
+		{
+			return skel;
+		}
+
+		foreach (Node child in node.GetChildren())
+		{
+			Skeleton3D? found = FindSkeleton(child);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
+	}
+
+	private static float SampleSkeletonBottomY(Skeleton3D? skeleton)
+	{
+		if (skeleton == null || !GodotObject.IsInstanceValid(skeleton))
+		{
+			return float.MaxValue;
+		}
+
+		float bottomY = float.MaxValue;
+		int count = skeleton.GetBoneCount();
+		Transform3D skelGlobal = skeleton.GlobalTransform;
+		for (int i = 0; i < count; i++)
+		{
+			Vector3 world = skelGlobal * skeleton.GetBoneGlobalPose(i).Origin;
+			if (world.Y < bottomY)
+			{
+				bottomY = world.Y;
+			}
+		}
+
+		return bottomY;
 	}
 }

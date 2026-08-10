@@ -13,7 +13,7 @@
 | Runtime           | **.NET 8**                                       |
 | Рендер            | Forward Plus                                     |
 | Перспектива       | 3D, камера сверху-сбоку (Sims / Project Zomboid) |
-| Графика прототипа | Примитивы (`CapsuleMesh`, `BoxMesh`)             |
+| Графика прототипа | Примитивы локации + Mixamo NPC (Mutant / Zombie) |
 
 
 Assembly: `DirgeOfWithering`  
@@ -66,22 +66,33 @@ Scripts/
   Camera/FollowCamera.cs
   Combat/                     # Health, Hitbox3D, hit-stop, layers
   Player/                     # move / aim / attack
-  Enemy/                      # BasicEnemy, EnemySpawner
+  Enemy/                      # BasicEnemy, EnemyAnimDriver, EnemySpawner
   World/ErrengardPalette.cs   # палитра среза (пепел / багровый / жёлтый)
   UI/DebugHud.cs
 Scenes/
-  Locations/FloodedCathedralSlice.tscn   # main scene (Vertical Slice 2.1)
+  Locations/FloodedCathedralSlice.tscn   # main scene (Vertical Slice)
   TestWorld.tscn                         # песочница Core Loop
   Player/Player.tscn
-  Enemy/BasicEnemy.tscn
+  Enemy/MutantBrute.tscn                 # Mixamo mutant
+  Enemy/ZombieThrall.tscn                # Mixamo zombie (Ch10)
+  Enemy/BasicEnemy.tscn                  # capsule fallback
+Assets/ThirdParty/BlightedWretch/        # Processed/*.glb — CREDITS.md
 CONCEPT.md
 ```
 
 ## Архитектура геймплея
 
-**Сейчас:** этап **2.2** — Скверна на срезе «Затопленный собор».  
-`Blight` / `BlightController`: набор от урона и RMB, бафф с 60%, перегрузка на 100% (drain HP + тинт мира).  
-Пассивный спад вне OVERLOAD, алтарь в апсиде очищает Скверну; HUD с полосками; RMB с телеграфом; враги злее при HIGH.
+**Сейчас:** этап **2.3** закрыт по канон-врагам.  
+Два архетипа на срезе:
+
+| Роль | Сцена | Имя в HUD | Характер |
+|------|-------|-----------|----------|
+| Давление | `MutantBrute` (неф) | Ихор-зверь | Быстрый, больший урон, меньше HP |
+| Блокер | `ZombieThrall` (апсида) | Пепельный ходок | Медленный, толстый, короткий хитбокс |
+
+Бой: телеграф (рык/крик) → удар с окном хитбокса по клипу → recovery; death держит позу ~3 с.  
+Пепельный `AshTint` на материалах; HUD показывает ближайшего врага по `DisplayName`.  
+Скверна (2.2) на месте.
 
 ```
 Player (CharacterBody3D)
@@ -90,9 +101,11 @@ Player (CharacterBody3D)
  └─ Visual (AimPivot)
      └─ Hitbox3D ──mask──► Enemy layer
 
-BasicEnemy (CharacterBody3D)
+MutantBrute / ZombieThrall (BasicEnemy)
  ├─ Health
+ ├─ AnimDriver  → idle / walk|run / telegraph / attack / death
  └─ Visual
+     ├─ Model (Processed/*.glb, текстуры зомби 1K)
      └─ Hitbox3D ──mask──► Player layer
 ```
 
@@ -156,9 +169,9 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 |------|------|--------|
 | 1. Core Loop | Move / attack / damage / death | Готово |
 | 2.1 Каркас среза | Локация «Затопленный собор», палитра, Core Loop на месте | Готово |
-| 2.2 Скверна | Шкала, бафф, перегрузка | **Сейчас** |
-| 2.3 Канон-враг | Читаемый архетип под лор | Дальше |
-| 2.4–2.7 | Арт маршрута, UI, звук, критерий «5 минут атмосферы» | Дальше |
+| 2.2 Скверна | Шкала, бафф, перегрузка | Готово |
+| 2.3 Канон-враг | Ихор-зверь + Пепельный ходок, телеграф, роли, тинт | Готово |
+| 2.4–2.7 | Арт маршрута, UI, звук, критерий «5 минут атмосферы» | **Сейчас** |
 
 Песочница Core Loop: `Scenes/TestWorld.tscn` (не main).
 

@@ -2,7 +2,8 @@
 
 [ext_resource type="PackedScene" path="res://Scenes/Player/Player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://Scripts/Camera/FollowCamera.cs" id="2_camera"]
-[ext_resource type="PackedScene" path="res://Scenes/Enemy/BasicEnemy.tscn" id="3_enemy"]
+[ext_resource type="PackedScene" path="res://Scenes/Enemy/MutantBrute.tscn" id="3_enemy_mutant"]
+[ext_resource type="PackedScene" path="res://Scenes/Enemy/ZombieThrall.tscn" id="3_enemy_zombie"]
 [ext_resource type="Script" path="res://Scripts/UI/DebugHud.cs" id="4_hud"]
 [ext_resource type="Script" path="res://Scripts/Enemy/EnemySpawner.cs" id="5_spawner"]
 
@@ -106,10 +107,16 @@ shape = SubResource("BoxShape_block")
 [node name="Player" parent="." instance=ExtResource("1_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 
-[node name="EnemySpawner" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+[node name="EnemySpawnerMutant" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -6)
 script = ExtResource("5_spawner")
-EnemyScene = ExtResource("3_enemy")
+EnemyScene = ExtResource("3_enemy_mutant")
+RespawnDelay = 2.5
+
+[node name="EnemySpawnerZombie" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -6)
+script = ExtResource("5_spawner")
+EnemyScene = ExtResource("3_enemy_zombie")
 RespawnDelay = 2.5
 
 [node name="FollowCamera" type="Node3D" parent="." node_paths=PackedStringArray("Target")]
