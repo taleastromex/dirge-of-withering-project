@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://nkxxk54h2afx"
 path.s3tc="res://.godot/imported/ZombieThrall_Ch10_1001_Glossiness.png-31a8dcc79ef7a4ab83e141bf26248cad.s3tc.ctex"
+path.etc2="res://.godot/imported/ZombieThrall_Ch10_1001_Glossiness.png-31a8dcc79ef7a4ab83e141bf26248cad.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall_Ch10_1001_Glossiness.png"
-dest_files=["res://.godot/imported/ZombieThrall_Ch10_1001_Glossiness.png-31a8dcc79ef7a4ab83e141bf26248cad.s3tc.ctex"]
+dest_files=["res://.godot/imported/ZombieThrall_Ch10_1001_Glossiness.png-31a8dcc79ef7a4ab83e141bf26248cad.s3tc.ctex", "res://.godot/imported/ZombieThrall_Ch10_1001_Glossiness.png-31a8dcc79ef7a4ab83e141bf26248cad.etc2.ctex"]
 
 [params]
 

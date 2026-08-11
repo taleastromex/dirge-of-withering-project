@@ -41,7 +41,7 @@ public partial class Player : CharacterBody3D
 	public PlayerAnimDriver? AnimDriver { get; set; }
 
 	[Export]
-	public float DeathRestartDelay { get; set; } = 1.6f;
+	public float DeathRestartDelay { get; set; } = 3.0f;
 
 	/// <summary>Множитель скорости во время замаха/удара.</summary>
 	[Export]
@@ -57,12 +57,19 @@ public partial class Player : CharacterBody3D
 	[Export]
 	public float LockedY { get; set; } = 0f;
 
+	[Export]
+	public float FootstepInterval { get; set; } = 0.38f;
+
+	[Export]
+	public float FootstepMinSpeed { get; set; } = 0.6f;
+
 	private Camera3D? _camera;
 	private Vector3 _aimForward = Vector3.Forward;
 	private bool _isDead;
 
 	private Vector3 _knockbackVelocity;
 	private float _knockbackTimer;
+	private float _footstepTimer;
 
 	private readonly System.Collections.Generic.List<StandardMaterial3D> _bodyMaterials = new();
 	private Color _baseColor = new(0.55f, 0.18f, 0.22f, 1f);
@@ -122,10 +129,34 @@ public partial class Player : CharacterBody3D
 		}
 
 		HandleMovement(dt);
+		UpdateFootsteps(dt);
 		ApplyVerticalLock();
 
 		Vector3 planar = new(Velocity.X, 0f, Velocity.Z);
 		AnimDriver?.UpdateLocomotion(planar.Length());
+	}
+
+	private void UpdateFootsteps(float dt)
+	{
+		Vector3 planar = new(Velocity.X, 0f, Velocity.Z);
+		float speed = planar.Length();
+		if (speed < FootstepMinSpeed || (Attack != null && Attack.LocksMovement))
+		{
+			_footstepTimer = 0f;
+			return;
+		}
+
+		float interval = FootstepInterval * Mathf.Clamp(MoveSpeed / Mathf.Max(speed, 0.01f), 0.55f, 1.25f);
+		_footstepTimer -= dt;
+		if (_footstepTimer > 0f)
+		{
+			return;
+		}
+
+		_footstepTimer = interval;
+		string[] steps = SliceAudioIds.FootstepsConcrete;
+		string clip = steps[GD.RandRange(0, steps.Length - 1)];
+		GameAudio.Instance?.PlaySfxOneShot(clip, volumeDbOffset: -10f, pitchScale: 0.92f + GD.Randf() * 0.16f);
 	}
 
 	private void ApplyVerticalLock()
@@ -267,6 +298,7 @@ public partial class Player : CharacterBody3D
 	{
 		SetBodyColor(new Color(0.95f, 0.85f, 0.85f, 1f));
 		_flashTimer = 0.1f;
+		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.PlayerHurt, volumeDbOffset: -6f, pitchScale: 1.05f);
 	}
 
 	/// <summary>Визуал Скверны: emission нарастает с шкалой.</summary>
@@ -286,6 +318,17 @@ public partial class Player : CharacterBody3D
 			mat.Emission = new Color(0.55f, 0.08f, 0.1f);
 			mat.EmissionEnergyMultiplier = emission;
 		}
+	}
+
+	public void SetFilthAuraActive(bool active)
+	{
+		if (_isDead)
+		{
+			active = false;
+		}
+
+		PlayerFilthAura? aura = GetNodeOrNull<PlayerFilthAura>("Visual/FilthAura");
+		aura?.SetHighFilthActive(active);
 	}
 
 	private void SetBodyColor(Color color)
@@ -375,10 +418,26 @@ public partial class Player : CharacterBody3D
 		CollisionLayer = 0;
 		CollisionMask = 0;
 		AnimDriver?.PlayDeath();
+		SetFilthAuraActive(false);
 		SetBodyColor(new Color(0.2f, 0.12f, 0.14f, 1f));
+		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.PlayerDeath, volumeDbOffset: -1f);
+		GameAudio.Instance?.PlaySfxOneShot(
+			SliceAudioIds.Pick(SliceAudioIds.PlayerDeathVoices),
+			volumeDbOffset: -2f);
 
-		GetTree().CreateTimer(DeathRestartDelay).Timeout += () =>
+		GetTree().CreateTimer(DeathRestartDelay, processAlways: true).Timeout += () =>
 		{
+			foreach (Node node in GetTree().GetNodesInGroup("death_screen"))
+			{
+				if (node is DeathScreen screen)
+				{
+					screen.ShowDeathScreen();
+					return;
+				}
+			}
+
+			// Fallback if HUD overlay missing.
+			GetTree().Paused = false;
 			GetTree().ReloadCurrentScene();
 		};
 	}

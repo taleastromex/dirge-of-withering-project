@@ -29,11 +29,11 @@ public partial class BlightController : Node
 
 	/// <summary>Пассивный спад Скверны вне перегрузки (ед/сек).</summary>
 	[Export]
-	public float PassiveDecayPerSecond { get; set; } = 5f;
+	public float PassiveDecayPerSecond { get; set; } = 1f;
 
 	/// <summary>Пауза после набора Скверны, прежде чем начнётся спад.</summary>
 	[Export]
-	public float DecayDelayAfterGain { get; set; } = 1.35f;
+	public float DecayDelayAfterGain { get; set; } = 0.6f;
 
 	[Export]
 	public Color OverloadTint { get; set; } = new(0.45f, 0.08f, 0.1f);
@@ -67,6 +67,7 @@ public partial class BlightController : Node
 			Blight.OverloadStarted += OnOverloadStarted;
 			Blight.OverloadEnded += OnOverloadEnded;
 			Blight.BlightChanged += OnBlightChanged;
+			CallDeferred(MethodName.UpdatePlayerBlightLook);
 		}
 	}
 
@@ -157,6 +158,7 @@ public partial class BlightController : Node
 	private void OnOverloadStarted()
 	{
 		_tintActive = true;
+		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.FilthOverload, volumeDbOffset: -1f);
 	}
 
 	private void OnOverloadEnded()
@@ -190,6 +192,7 @@ public partial class BlightController : Node
 
 		_environmentCached = true;
 		RestoreEnvironment();
+		UpdatePlayerBlightLook();
 	}
 
 	private void UpdateWorldTint()
@@ -240,6 +243,8 @@ public partial class BlightController : Node
 			return;
 		}
 
+		bool dead = Health != null && Health.IsDead;
 		Player.SetBlightVisual(Blight.Normalized, Blight.IsOverloaded);
+		Player.SetFilthAuraActive(!dead && Blight.IsHigh);
 	}
 }

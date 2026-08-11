@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Player/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://Scripts/Combat/BlightController.cs" id="6_blight_ctrl"]
 [ext_resource type="Script" path="res://Scripts/Player/PlayerAnimDriver.cs" id="7_anim"]
 [ext_resource type="PackedScene" path="res://Assets/ThirdParty/BloodKnight/Processed/BloodKnight.glb" id="8_model"]
+[ext_resource type="Script" path="res://Scripts/Player/PlayerWeaponAttach.cs" id="9_weapon"]
+[ext_resource type="Script" path="res://Scripts/Player/PlayerFilthAura.cs" id="10_filth_aura"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.35
@@ -50,6 +52,8 @@ Player = NodePath("..")
 BlightPerDamageTaken = 0.55
 BlightPerHeavyAttack = 16.0
 OverloadDrainPerSecond = 14.0
+PassiveDecayPerSecond = 1.0
+DecayDelayAfterGain = 0.6
 
 [node name="PlayerAttack" type="Node" parent="." node_paths=PackedStringArray("Hitbox", "Health", "BlightController", "AnimDriver")]
 script = ExtResource("3_attack")
@@ -83,6 +87,21 @@ AttackHitNormEnd = 0.58
 HeavyAttackHitNormStart = 0.58
 HeavyAttackHitNormEnd = 0.78
 
+[node name="WeaponAttach" type="Node" parent="." node_paths=PackedStringArray("AnimDriver")]
+script = ExtResource("9_weapon")
+ModelPath = NodePath("../Visual/Model")
+BoneName = "mixamorig:RightHand"
+WeaponPath = "res://Assets/ThirdParty/Weapons/zweihander.glb"
+TargetLengthMeters = 1.65
+GripLocalPosition = Vector3(0, 0.06, -0.03)
+GripLocalRotationDegrees = Vector3(225, 0, -90)
+StrikeGripLocalRotationDegrees = Vector3(160, 0, -90)
+BladeSlideMeters = 0.32
+StrikeBladeSlideMeters = 0.22
+StrikeBlendInNorm = 0.1
+StrikeBlendOutNorm = 0.14
+AnimDriver = NodePath("../AnimDriver")
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 shape = SubResource("CapsuleShape3D_body")
@@ -91,6 +110,13 @@ shape = SubResource("CapsuleShape3D_body")
 
 [node name="Model" parent="Visual" instance=ExtResource("8_model")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="FilthAura" type="Node3D" parent="Visual"]
+script = ExtResource("10_filth_aura")
+TargetDiameterMeters = 2.6
+LocalOffset = Vector3(0, 0.12, 0)
+AuraColor = Color(0.85, 0.12, 0.14, 0.38)
+AuraIntensity = 0.42
 
 [node name="Hitbox" type="Area3D" parent="Visual" node_paths=PackedStringArray("OwnerRoot", "DebugMesh")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, -1.05)

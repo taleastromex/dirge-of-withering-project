@@ -12,6 +12,9 @@
 [ext_resource type="PackedScene" uid="uid://cnnuljpf4a5v4" path="res://Assets/ThirdParty/CathedralSlice/Processed/CathedralSliceArt.glb" id="9_art"]
 [ext_resource type="Script" uid="uid://jw8wj06lf45x" path="res://Scripts/World/CathedralArtCollision.cs" id="10_art_col"]
 [ext_resource type="Script" uid="uid://cjixgxtkgq1kf" path="res://Scripts/World/CathedralArtVariation.cs" id="11_art_var"]
+[ext_resource type="Script" uid="uid://2x7mprrqh48e" path="res://Scripts/Audio/SliceAudioBootstrap.cs" id="12_audio"]
+[ext_resource type="Script" uid="uid://dv2muj853c2jf" path="res://Scripts/UI/DeathScreen.cs" id="13_death"]
+[ext_resource type="Script" uid="uid://ch0a76win5e46" path="res://Scripts/World/SliceParticleAccents.cs" id="14_particles"]
 
 [sub_resource type="Environment" id="Environment_slice"]
 background_mode = 1
@@ -616,6 +619,9 @@ fov = 40.0
 near = 0.1
 far = 140.0
 
+[node name="AudioListener3D" type="AudioListener3D" parent="FollowCamera/Camera3D" unique_id=206464518]
+current = true
+
 [node name="CameraOcclusionFader" type="Node" parent="FollowCamera" unique_id=1288061387 node_paths=PackedStringArray("Target", "Camera")]
 script = ExtResource("6_fader")
 Target = NodePath("../../Player")
@@ -624,3 +630,12 @@ FadeLerpSpeed = 14.0
 
 [node name="SliceHud" type="CanvasLayer" parent="." unique_id=568899075]
 script = ExtResource("4_hud")
+
+[node name="DeathScreen" type="CanvasLayer" parent="." unique_id=1905652888]
+script = ExtResource("13_death")
+
+[node name="SliceAudioBootstrap" type="Node" parent="." unique_id=1552034474]
+script = ExtResource("12_audio")
+
+[node name="SliceParticleAccents" type="Node3D" parent="." unique_id=76976193]
+script = ExtResource("14_particles")

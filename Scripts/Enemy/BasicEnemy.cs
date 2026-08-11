@@ -308,7 +308,6 @@ public partial class BasicEnemy : CharacterBody3D
 		Hitbox?.SetActive(false);
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		FacePlayer(999f);
-		ApplyTelegraphTint();
 		AnimDriver?.PlayTelegraph();
 		UpdateNameplateVisibility();
 	}
@@ -517,8 +516,6 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 	}
 
-	private void ApplyTelegraphTint() => SetTintMul(new Color(1.15f, 0.55f, 0.45f, 1f));
-
 	private void ApplyStaggerTint() => SetTintMul(new Color(1.05f, 0.95f, 0.55f, 1f));
 
 	private void RestoreTint()
@@ -586,6 +583,11 @@ public partial class BasicEnemy : CharacterBody3D
 			Visual.Visible = false;
 			_deathSettling = false;
 		}
+
+		GameAudio.Instance?.PlaySfxOneShot(
+			SliceAudioIds.EnemyDeath,
+			volumeDbOffset: -3f,
+			pitchScale: 0.9f + GD.Randf() * 0.2f);
 
 		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
 	}

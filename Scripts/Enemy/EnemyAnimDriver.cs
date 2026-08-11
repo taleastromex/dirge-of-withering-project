@@ -30,10 +30,10 @@ public partial class EnemyAnimDriver : Node
 
 	/// <summary>Доля длины attack-клипа, когда хитбокс активен (0..1).</summary>
 	[Export(PropertyHint.Range, "0,1,0.01")]
-	public float AttackHitNormStart { get; set; } = 0.42f;
+	public float AttackHitNormStart { get; set; } = 0.48f;
 
 	[Export(PropertyHint.Range, "0,1,0.01")]
-	public float AttackHitNormEnd { get; set; } = 0.68f;
+	public float AttackHitNormEnd { get; set; } = 0.62f;
 
 	private AnimKind _kind = AnimKind.None;
 	private string _current = "";

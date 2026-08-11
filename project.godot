@@ -18,6 +18,14 @@ config/name="Dirge of Withering"
 run/main_scene="res://Scenes/Locations/FloodedCathedralSlice.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
+
+[autoload]
+
+GameAudio="*res://Scripts/Audio/GameAudio.cs"
+
 [dotnet]
 
 project/assembly_name="DirgeOfWithering"
@@ -68,4 +76,5 @@ move_right={
 
 [rendering]
 
+textures/vram_compression/import_etc2_astc=true
 textures/canvas_textures/default_texture_filter=0
