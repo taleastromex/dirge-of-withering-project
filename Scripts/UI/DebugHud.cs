@@ -3,7 +3,7 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Прототипный HUD среза: полоски HP / Скверны + ближайший враг по имени.
+/// Debug HUD для TestWorld / ребаланса: HP, FILTH, урон, resist.
 /// </summary>
 public partial class DebugHud : CanvasLayer
 {
@@ -17,6 +17,8 @@ public partial class DebugHud : CanvasLayer
 	private Label? _blightLabel;
 	private Health? _playerHealth;
 	private Blight? _playerBlight;
+	private BlightController? _blightController;
+	private PlayerAttack? _playerAttack;
 	private Node3D? _playerNode;
 	private BasicEnemy? _focusEnemy;
 	private Health? _enemyHealth;
@@ -48,7 +50,7 @@ public partial class DebugHud : CanvasLayer
 		var root = new VBoxContainer
 		{
 			Position = new Vector2(16, 16),
-			CustomMinimumSize = new Vector2(300, 0)
+			CustomMinimumSize = new Vector2(340, 0)
 		};
 		AddChild(root);
 
@@ -63,7 +65,7 @@ public partial class DebugHud : CanvasLayer
 		root.AddChild(_blightBar);
 
 		_statusLabel = MakeLabel("—");
-		_statusLabel.AddThemeFontSizeOverride("font_size", 15);
+		_statusLabel.AddThemeFontSizeOverride("font_size", 14);
 		root.AddChild(_statusLabel);
 	}
 
@@ -79,7 +81,7 @@ public partial class DebugHud : CanvasLayer
 	{
 		var bar = new ProgressBar
 		{
-			CustomMinimumSize = new Vector2(300, 18),
+			CustomMinimumSize = new Vector2(340, 18),
 			MaxValue = 100,
 			Value = 0,
 			ShowPercentage = false
@@ -119,7 +121,8 @@ public partial class DebugHud : CanvasLayer
 				_hpBar.MaxValue = _playerHealth.MaxHealth;
 				_hpBar.Value = _playerHealth.Current;
 				string iframe = _playerHealth.IsInvulnerable ? "  [i-frames]" : "";
-				_hpLabel.Text = $"HP  {_playerHealth.Current}/{_playerHealth.MaxHealth}{iframe}";
+				_hpLabel.Text =
+					$"HP  {_playerHealth.Current}/{_playerHealth.MaxHealth}  resist {_playerHealth.PhysicalResist:0%}{iframe}";
 			}
 			else
 			{
@@ -149,12 +152,13 @@ public partial class DebugHud : CanvasLayer
 				}
 
 				SetBarFill(_blightBar, fill);
-				_blightLabel.Text = $"Blight  {_playerBlight.Current:0}/{_playerBlight.MaxBlight:0}{state}";
+				_blightLabel.Text =
+					$"FILTH  {_playerBlight.Current:0}/{_playerBlight.MaxBlight:0}{state}  ×{_playerBlight.DamageMultiplier:0.00}";
 			}
 			else
 			{
 				_blightBar.Value = 0;
-				_blightLabel.Text = "Blight  —";
+				_blightLabel.Text = "FILTH  —";
 			}
 		}
 
@@ -167,15 +171,23 @@ public partial class DebugHud : CanvasLayer
 		if (_focusEnemy != null && GodotObject.IsInstanceValid(_focusEnemy) &&
 			_enemyHealth != null && GodotObject.IsInstanceValid(_enemyHealth))
 		{
-			enemyText = $"{_focusEnemy.DisplayName}  {_enemyHealth.Current}/{_enemyHealth.MaxHealth}";
+			enemyText =
+				$"{_focusEnemy.DisplayName}  {_enemyHealth.Current}/{_enemyHealth.MaxHealth}  resist {_enemyHealth.PhysicalResist:0%}";
 		}
 		else
 		{
 			enemyText = "Враги: —";
 		}
 
+		int light = _playerAttack?.ComputeOutgoingDamage(false) ?? 0;
+		int heavy = _playerAttack?.ComputeOutgoingDamage(true) ?? 0;
+		float drain = _blightController?.OverloadDrainPerSecond ?? 0f;
+		int n = _playerAttack?.Damage ?? 0;
+
 		_statusLabel.Text =
-			$"{enemyText}\nLMB удар | RMB тяжёлый (+Скверна)\nАлтарь очищает Скверну";
+			$"{enemyText}\n" +
+			$"N={n}  light→{light}  heavy→{heavy}  drain {drain:0}/s\n" +
+			"LMB light | RMB Высвобождение (+FILTH) | алтарь очищает";
 	}
 
 	private static void SetBarFill(ProgressBar bar, Color color)
@@ -210,6 +222,8 @@ public partial class DebugHud : CanvasLayer
 			?? GetTree().GetFirstNodeInGroup("player") as Node3D;
 		_playerHealth = _playerNode?.GetNodeOrNull<Health>("Health");
 		_playerBlight = _playerNode?.GetNodeOrNull<Blight>("Blight");
+		_blightController = _playerNode?.GetNodeOrNull<BlightController>("BlightController");
+		_playerAttack = _playerNode?.GetNodeOrNull<PlayerAttack>("PlayerAttack");
 	}
 
 	private void ResolveClosestEnemy()

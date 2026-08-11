@@ -183,7 +183,10 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 2.4 Локация | Sketchfab-арт маршрута, кьяроскуро, пропы | Готово |
 | 2.5 UI среза | SliceHud (Health/FILTH), nameplates, fog/grading | Готово |
 | 2.6–2.7 | Звук, критерий «5 минут атмосферы» | Готово |
-| **3. Ребаланс** | Урон / FILTH / окна хитбоксов / читаемость HIGH-баффа | **Следующее** |
+| 3.1 | Health `PhysicalResist`; игрок Knight-tier (HP 180 / 20%); Walker 160/40/25%; Beast 250/60/35% | Готово |
+| 3.2 | Ступени FILTH (50/75/90/100), drain 6 HP/с, hybrid phys+ichor | Готово |
+| 3.3 | FILTH только с `Hitbox.FilthPerDamage`; HUD × множитель | Готово |
+| 3.4 | Docs / playtest DoD ребаланса | Готово |
 | 4. Масштабирование | Больше контента и систем за пределами одного среза | Далее |
 
 ### DoD Vertical Slice (playtest ~5 мин)
@@ -201,11 +204,11 @@ Credits: [`Assets/Audio/CREDITS.md`](Assets/Audio/CREDITS.md).
 
 Песочница Core Loop: `Scenes/TestWorld.tscn` (не main; удобна для ребаланса).
 
+Канон боя/FILTH этапа 3: [`Concepts/DAMAGE.md`](Concepts/DAMAGE.md), [`Concepts/SKILLS.md`](Concepts/SKILLS.md).
+
 ### Перспективы (после ребаланса / при масштабировании)
 
 **Бой и прогрессия**
-- Ребаланс урона, FILTH gain/decay, порогов HIGH / OVERLOAD.
-- Явнее связать урон со скверной (множители уже есть — донастроить и показать в UI).
 - Анимации получения урона с прерыванием атак (player + enemies).
 - 3D SFX врагов: шаги, рычания / телеграф-вой, смерть (spatial `AudioStreamPlayer3D`).
 
@@ -220,5 +223,8 @@ Credits: [`Assets/Audio/CREDITS.md`](Assets/Audio/CREDITS.md).
 
 ## Документация
 
-- [CONCEPT.md](CONCEPT.md) — сеттинг, герой, Скверна, живое оружие, метроидвания, моральные развилки.
+- [CONCEPT.md](CONCEPT.md) / [`Concepts/CONCEPT.md`](Concepts/CONCEPT.md) — сеттинг
+- [`Concepts/DAMAGE.md`](Concepts/DAMAGE.md) — типы урона, FILTH-ступени, якорь этапа 3
+- [`Concepts/SKILLS.md`](Concepts/SKILLS.md) — атрибуты / Filth Level
+- [`Concepts/NPCs.md`](Concepts/NPCs.md) — категории и карточки NPC
 

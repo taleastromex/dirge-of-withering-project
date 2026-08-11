@@ -3,7 +3,7 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Связывает Скверну с игроком: набор от урона, drain на перегрузке, тинт мира, баффы.
+/// Связывает Скверну с игроком: набор от хитбоксов/heavy, drain на перегрузке, тинт мира, баффы.
 /// </summary>
 public partial class BlightController : Node
 {
@@ -16,16 +16,12 @@ public partial class BlightController : Node
 	[Export]
 	public Player? Player { get; set; }
 
-	/// <summary>Скверна за 1 ед. полученного урона.</summary>
+	/// <summary>Потолок FILTH от одного Высвобождения Ихора.</summary>
 	[Export]
-	public float BlightPerDamageTaken { get; set; } = 0.55f;
-
-	/// <summary>Скверна за тяжёлую атаку (RMB).</summary>
-	[Export]
-	public float BlightPerHeavyAttack { get; set; } = 16f;
+	public float HeavyFilthSoftCap { get; set; } = 20f;
 
 	[Export]
-	public float OverloadDrainPerSecond { get; set; } = 14f;
+	public float OverloadDrainPerSecond { get; set; } = 6f;
 
 	/// <summary>Пассивный спад Скверны вне перегрузки (ед/сек).</summary>
 	[Export]
@@ -57,11 +53,6 @@ public partial class BlightController : Node
 		// После SliceAtmosphere / полного входа сцены в дерево.
 		CallDeferred(MethodName.CacheEnvironment);
 
-		if (Health != null)
-		{
-			Health.Damaged += OnDamaged;
-		}
-
 		if (Blight != null)
 		{
 			Blight.OverloadStarted += OnOverloadStarted;
@@ -90,32 +81,39 @@ public partial class BlightController : Node
 		ApplyOverloadDrain(dt);
 	}
 
-	/// <summary>Вызывать при старте тяжёлой атаки.</summary>
-	public void NotifyHeavyAttackUsed()
+	/// <summary>
+	/// FILTH от удара (искажённые и т.п.). amount — уже после resist цели.
+	/// </summary>
+	public void NotifyFilthFromHit(float amount)
 	{
-		if (Blight == null)
+		if (Blight == null || amount <= 0f)
 		{
 			return;
 		}
 
-		Blight.Add(BlightPerHeavyAttack);
+		Blight.Add(amount);
+		_decayDelayTimer = DecayDelayAfterGain;
+	}
+
+	/// <summary>
+	/// Высвобождение Ихора: filth_self = min(0.5 × (2×N), SoftCap).
+	/// </summary>
+	public void NotifyHeavyAttackUsed(int lightBaseDamage)
+	{
+		if (Blight == null || lightBaseDamage <= 0)
+		{
+			return;
+		}
+
+		float releaseN = 2f * lightBaseDamage;
+		float filth = Mathf.Min(0.5f * releaseN, HeavyFilthSoftCap);
+		Blight.Add(filth);
 		_decayDelayTimer = DecayDelayAfterGain;
 	}
 
 	public float GetDamageMultiplier() => Blight?.DamageMultiplier ?? 1f;
 
 	public float GetSpeedMultiplier() => Blight?.SpeedMultiplier ?? 1f;
-
-	private void OnDamaged(int amount, Vector3 sourcePosition)
-	{
-		if (Blight == null)
-		{
-			return;
-		}
-
-		Blight.Add(amount * BlightPerDamageTaken);
-		_decayDelayTimer = DecayDelayAfterGain;
-	}
 
 	private void ApplyPassiveDecay(float delta)
 	{
