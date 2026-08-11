@@ -21,3 +21,4 @@ obj/
 
 # Sketchfab raw downloads (rebuild via Tools/build_cathedral_slice_art.py)
 Assets/ThirdParty/CathedralSlice/Source/
+build/

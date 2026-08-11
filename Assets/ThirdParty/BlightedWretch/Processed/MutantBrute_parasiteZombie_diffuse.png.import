@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://co2gsh7tsmxtg"
 path.s3tc="res://.godot/imported/MutantBrute_parasiteZombie_diffuse.png-c99cac97eed4f1cef870682650082614.s3tc.ctex"
+path.etc2="res://.godot/imported/MutantBrute_parasiteZombie_diffuse.png-c99cac97eed4f1cef870682650082614.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/ThirdParty/BlightedWretch/Processed/MutantBrute_parasiteZombie_diffuse.png"
-dest_files=["res://.godot/imported/MutantBrute_parasiteZombie_diffuse.png-c99cac97eed4f1cef870682650082614.s3tc.ctex"]
+dest_files=["res://.godot/imported/MutantBrute_parasiteZombie_diffuse.png-c99cac97eed4f1cef870682650082614.s3tc.ctex", "res://.godot/imported/MutantBrute_parasiteZombie_diffuse.png-c99cac97eed4f1cef870682650082614.etc2.ctex"]
 
 [params]
 

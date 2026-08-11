@@ -95,21 +95,21 @@ public partial class SliceHud : CanvasLayer
 		{
 			AnchorRight = 0f,
 			AnchorBottom = 0f,
-			OffsetLeft = 20,
-			OffsetTop = 18,
-			OffsetRight = 340,
-			OffsetBottom = 140
+			OffsetLeft = 24,
+			OffsetTop = 22,
+			OffsetRight = 430,
+			OffsetBottom = 175
 		};
 		AddChild(_root);
 
 		var column = new VBoxContainer();
-		column.AddThemeConstantOverride("separation", 6);
+		column.AddThemeConstantOverride("separation", 8);
 		_root.AddChild(column);
 
 		_healthLabel = MakeLabel("Health");
 		column.AddChild(_healthLabel);
 
-		var healthTrack = new Control { CustomMinimumSize = new Vector2(280, 12) };
+		var healthTrack = new Control { CustomMinimumSize = new Vector2(360, 16) };
 		column.AddChild(healthTrack);
 		_healthBar = MakeBar(HealthFill);
 		_healthBar.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -119,7 +119,7 @@ public partial class SliceHud : CanvasLayer
 		_filthLabel = MakeLabel("FILTH");
 		column.AddChild(_filthLabel);
 
-		_filthTrack = new Control { CustomMinimumSize = new Vector2(280, 12) };
+		_filthTrack = new Control { CustomMinimumSize = new Vector2(360, 16) };
 		column.AddChild(_filthTrack);
 		_filthBar = MakeBar(FilthNormal);
 		_filthBar.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -130,7 +130,7 @@ public partial class SliceHud : CanvasLayer
 		{
 			Color = new Color(0.92f, 0.78f, 0.45f, 0.9f),
 			MouseFilter = Control.MouseFilterEnum.Ignore,
-			Size = new Vector2(2, 12),
+			Size = new Vector2(3, 16),
 			ZIndex = 2
 		};
 		_filthTrack.AddChild(_highMark);
@@ -142,13 +142,13 @@ public partial class SliceHud : CanvasLayer
 			AnchorBottom = 1f,
 			AnchorLeft = 0f,
 			AnchorRight = 0f,
-			OffsetLeft = 20,
-			OffsetTop = -36,
-			OffsetRight = 560,
-			OffsetBottom = -14
+			OffsetLeft = 24,
+			OffsetTop = -42,
+			OffsetRight = 640,
+			OffsetBottom = -16
 		};
 		_hintLabel.AddThemeColorOverride("font_color", new Color(0.62f, 0.56f, 0.5f, 0.85f));
-		_hintLabel.AddThemeFontSizeOverride("font_size", 12);
+		_hintLabel.AddThemeFontSizeOverride("font_size", 15);
 		if (DisplayFont != null)
 		{
 			_hintLabel.AddThemeFontOverride("font", DisplayFont);
@@ -161,7 +161,7 @@ public partial class SliceHud : CanvasLayer
 	{
 		var label = new Label { Text = text };
 		label.AddThemeColorOverride("font_color", LabelColor);
-		label.AddThemeFontSizeOverride("font_size", 15);
+		label.AddThemeFontSizeOverride("font_size", 19);
 		if (DisplayFont != null)
 		{
 			label.AddThemeFontOverride("font", DisplayFont);
@@ -174,7 +174,7 @@ public partial class SliceHud : CanvasLayer
 	{
 		var bar = new ProgressBar
 		{
-			CustomMinimumSize = new Vector2(280, 12),
+			CustomMinimumSize = new Vector2(360, 16),
 			MaxValue = 100,
 			Value = 0,
 			ShowPercentage = false
@@ -301,7 +301,7 @@ public partial class SliceHud : CanvasLayer
 			? 0.6f
 			: Mathf.Clamp(_playerFilth.HighThreshold / _playerFilth.MaxBlight, 0f, 1f);
 		_highMark.Position = new Vector2(width * t - 1f, 0f);
-		_highMark.Size = new Vector2(2f, Mathf.Max(12f, _filthTrack.Size.Y));
+		_highMark.Size = new Vector2(3f, Mathf.Max(16f, _filthTrack.Size.Y));
 	}
 
 	private void ResolvePlayer()

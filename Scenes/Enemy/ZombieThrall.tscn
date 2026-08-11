@@ -56,8 +56,8 @@ TelegraphClip = "stagger"
 AttackClip = "attack"
 StaggerClip = "stagger"
 DeathClip = "death"
-AttackHitNormStart = 0.45
-AttackHitNormEnd = 0.72
+AttackHitNormStart = 0.32
+AttackHitNormEnd = 0.46
 
 [node name="Nameplate" type="Node3D" parent="."]
 script = ExtResource("6_plate")

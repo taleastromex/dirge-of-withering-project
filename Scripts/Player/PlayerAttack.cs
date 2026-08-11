@@ -159,6 +159,20 @@ public partial class PlayerAttack : Node
 		if (heavy)
 		{
 			BlightController?.NotifyHeavyAttackUsed();
+			GameAudio.Instance?.PlaySfxOneShot(
+				SliceAudioIds.Pick(SliceAudioIds.SwingWhooshes),
+				volumeDbOffset: -1f);
+			GameAudio.Instance?.PlaySfxOneShot(
+				SliceAudioIds.Pick(SliceAudioIds.HeavyAttackVoices),
+				volumeDbOffset: -2f,
+				pitchScale: 0.96f + GD.Randf() * 0.08f);
+		}
+		else
+		{
+			GameAudio.Instance?.PlaySfxOneShot(
+				SliceAudioIds.Pick(SliceAudioIds.SwingWhooshes),
+				volumeDbOffset: -3f,
+				pitchScale: 1.02f + GD.Randf() * 0.08f);
 		}
 
 		SetTelegraphVisible(false);

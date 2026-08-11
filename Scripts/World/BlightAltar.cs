@@ -37,11 +37,23 @@ public partial class BlightAltar : Area3D
 	[Export]
 	public float ActiveEmission { get; set; } = 2.4f;
 
+	[Export]
+	public float AltarHumMaxDistance { get; set; } = 14f;
+
+	[Export]
+	public float AltarHumVolumeDb { get; set; } = 3f;
+
+	[Export]
+	public float AltarHumFadeSpeed { get; set; } = 2.4f;
+
 	private Blight? _playerBlight;
 	private readonly System.Collections.Generic.List<StandardMaterial3D> _glowMaterials = new();
 	private float _pulse;
 	private float _activeBlend;
 	private MeshInstance3D? _aura;
+	private AudioStreamPlayer3D? _humPlayer;
+	private float _humTargetDb = -80f;
+	private bool _playerInRange;
 
 	public override void _Ready()
 	{
@@ -54,6 +66,7 @@ public partial class BlightAltar : Area3D
 		BodyExited += OnBodyExited;
 
 		AltarLight ??= GetTree().CurrentScene?.GetNodeOrNull<OmniLight3D>("Lighting/AltarGlow");
+		EnsureHumPlayer();
 		CallDeferred(MethodName.BindVisuals);
 	}
 
@@ -61,6 +74,7 @@ public partial class BlightAltar : Area3D
 	{
 		float dt = (float)delta;
 		_pulse += dt * 4.2f;
+		UpdateHumFade(dt);
 
 		bool cleansing = _playerBlight != null && GodotObject.IsInstanceValid(_playerBlight);
 		_activeBlend = Mathf.MoveToward(_activeBlend, cleansing ? 1f : 0f, dt * 2.8f);
@@ -230,6 +244,10 @@ public partial class BlightAltar : Area3D
 		{
 			_playerBlight.Remove(EnterBurstCleanse);
 		}
+
+		_playerInRange = true;
+		_humTargetDb = AltarHumVolumeDb;
+		EnsureHumPlaying();
 	}
 
 	private void OnBodyExited(Node3D body)
@@ -237,6 +255,81 @@ public partial class BlightAltar : Area3D
 		if (body is Player)
 		{
 			_playerBlight = null;
+			_playerInRange = false;
+			_humTargetDb = -80f;
+		}
+	}
+
+	private void EnsureHumPlayer()
+	{
+		if (_humPlayer != null)
+		{
+			return;
+		}
+
+		AudioStream? stream = GD.Load<AudioStream>(SliceAudioIds.Altar);
+		if (stream == null)
+		{
+			return;
+		}
+
+		// Duplicate so we can enable loop without mutating a shared cache entry.
+		stream = (AudioStream)stream.Duplicate();
+		if (stream is AudioStreamMP3 mp3)
+		{
+			mp3.Loop = true;
+		}
+		else if (stream is AudioStreamOggVorbis ogg)
+		{
+			ogg.Loop = true;
+		}
+
+		_humPlayer = new AudioStreamPlayer3D
+		{
+			Name = "AltarHum",
+			Stream = stream,
+			Bus = "SFX",
+			VolumeDb = -80f,
+			MaxDistance = AltarHumMaxDistance,
+			UnitSize = 3.5f,
+			AttenuationFilterCutoffHz = 5000f,
+			EmissionAngleEnabled = false,
+			MaxDb = 6f,
+		};
+		AddChild(_humPlayer);
+	}
+
+	private void EnsureHumPlaying()
+	{
+		if (_humPlayer == null)
+		{
+			EnsureHumPlayer();
+		}
+
+		if (_humPlayer != null && !_humPlayer.Playing)
+		{
+			_humPlayer.Play();
+		}
+	}
+
+	private void UpdateHumFade(float dt)
+	{
+		if (_humPlayer == null)
+		{
+			return;
+		}
+
+		if (_playerInRange)
+		{
+			_humTargetDb = AltarHumVolumeDb;
+			EnsureHumPlaying();
+		}
+
+		_humPlayer.VolumeDb = Mathf.MoveToward(_humPlayer.VolumeDb, _humTargetDb, AltarHumFadeSpeed * 28f * dt);
+		if (!_playerInRange && _humPlayer.VolumeDb <= -48f && _humPlayer.Playing)
+		{
+			_humPlayer.Stop();
+			_humPlayer.VolumeDb = -80f;
 		}
 	}
 }

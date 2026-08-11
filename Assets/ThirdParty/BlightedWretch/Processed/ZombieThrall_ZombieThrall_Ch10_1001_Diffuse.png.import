@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://djtxfj5fwbcmu"
 path.s3tc="res://.godot/imported/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png-b46189c819fb73f4d345a090c98bc766.s3tc.ctex"
+path.etc2="res://.godot/imported/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png-b46189c819fb73f4d345a090c98bc766.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png"
-dest_files=["res://.godot/imported/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png-b46189c819fb73f4d345a090c98bc766.s3tc.ctex"]
+dest_files=["res://.godot/imported/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png-b46189c819fb73f4d345a090c98bc766.s3tc.ctex", "res://.godot/imported/ZombieThrall_ZombieThrall_Ch10_1001_Diffuse.png-b46189c819fb73f4d345a090c98bc766.etc2.ctex"]
 
 [params]
 

@@ -59,9 +59,65 @@ public partial class PlayerAnimDriver : Node
 
 	public AnimKind CurrentKind => _kind;
 
+	public bool IsPlayingAttack => _kind == AnimKind.Attack;
+
+	public bool IsHeavyAttack => _heavyAttack;
+
 	public override void _Ready()
 	{
 		CallDeferred(MethodName.BindPlayer);
+	}
+
+	public void GetAttackHitWindow(out float start, out float end)
+	{
+		start = _heavyAttack ? HeavyAttackHitNormStart : AttackHitNormStart;
+		end = _heavyAttack ? HeavyAttackHitNormEnd : AttackHitNormEnd;
+	}
+
+	/// <summary>
+	/// 0 = idle grip, 1 = fully extended strike grip.
+	/// Ramps in before the hitbox window and out after it.
+	/// </summary>
+	public float GetWeaponStrikeWeight(float blendInNorm = 0.1f, float blendOutNorm = 0.14f)
+	{
+		if (_kind != AnimKind.Attack)
+		{
+			return 0f;
+		}
+
+		float len = GetCurrentLength();
+		if (len <= 0.01f)
+		{
+			return 0f;
+		}
+
+		float t = GetCurrentPosition() / len;
+		GetAttackHitWindow(out float hitStart, out float hitEnd);
+		float rampIn = Mathf.Max(0f, hitStart - Mathf.Max(0.01f, blendInNorm));
+		float rampOut = Mathf.Min(1f, hitEnd + Mathf.Max(0.01f, blendOutNorm));
+
+		if (t <= rampIn || t >= rampOut)
+		{
+			return 0f;
+		}
+
+		if (t < hitStart)
+		{
+			return SmoothStep(rampIn, hitStart, t);
+		}
+
+		if (t <= hitEnd)
+		{
+			return 1f;
+		}
+
+		return 1f - SmoothStep(hitEnd, rampOut, t);
+	}
+
+	private static float SmoothStep(float edge0, float edge1, float x)
+	{
+		float t = Mathf.Clamp((x - edge0) / Mathf.Max(0.0001f, edge1 - edge0), 0f, 1f);
+		return t * t * (3f - 2f * t);
 	}
 
 	public void BindPlayer()

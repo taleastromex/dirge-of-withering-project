@@ -49,10 +49,10 @@
 - **Source folder:** `Source/lantern/` (`SM_Flashlight.fbx`)
 - **License:** как указано на странице модели
 
-### Two Piles of Construction Rubble
-- **Role:** скачан, **не используется** (меш отображался некорректно)
-- **File:** `Source/two_piles_of_construction_rubble.glb`
-- **License:** как указано на странице модели
+### Zweihander (player prop)
+- **Role:** visible greatsword on Blood Knight right hand (`PlayerWeaponAttach`)
+- **File:** `Source/zweihander.glb`
+- **License:** as specified by the asset source (verify before commercial release)
 
 ## Скачано, но не вошло в финальный GLB
 

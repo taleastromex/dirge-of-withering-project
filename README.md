@@ -79,6 +79,10 @@ Scenes/
 Assets/ThirdParty/BloodKnight/           # player glb — CREDITS.md
 Assets/ThirdParty/BlightedWretch/        # NPC glb — CREDITS.md
 Assets/ThirdParty/CathedralSlice/        # локация: Processed/CathedralSliceArt.glb — CREDITS.md
+Assets/ThirdParty/Weapons/               # zweihander.glb
+Assets/ThirdParty/appearance-effect-starlight/  # HIGH-FILTH aura
+Assets/Audio/                            # music + SFX — CREDITS.md
+Assets/VFX/Particles/                    # ash / smoke sprites
 Tools/build_cathedral_slice_art.py       # Blender: сборка арта локации
 Tools/merge_mixamo_anims.py              # Mixamo FBX → GLB (mutant/zombie/blood_knight)
 Tools/prepare_cathedral_slice_assets.sh  # распаковка Source → kits
@@ -87,8 +91,8 @@ CONCEPT.md
 
 ## Архитектура геймплея
 
-**Сейчас:** этап **2.4** — арт маршрута на Sketchfab-мешах.  
-Маршрут: вход → неф (Ichor Beast) → апсида (Ash Walker) → алтарь очищения.  
+**Сейчас:** Vertical Slice **закрыт** (2.1–2.7). Дальше — расширение за пределы среза.  
+Маршрут среза: вход → неф (Ichor Beast) → апсида (Ash Walker) → алтарь очищения.  
 Визуал: `CathedralSliceArt.glb`; коллизии — прежние `StaticBody3D` в сцене.
 
 | Роль | Сцена | DisplayName | Характер |
@@ -178,9 +182,41 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 2.3 Канон-враг | Ихор-зверь + Пепельный ходок, телеграф, роли, тинт | Готово |
 | 2.4 Локация | Sketchfab-арт маршрута, кьяроскуро, пропы | Готово |
 | 2.5 UI среза | SliceHud (Health/FILTH), nameplates, fog/grading | Готово |
-| 2.6–2.7 | Звук, критерий «5 минут атмосферы» | **Сейчас** |
+| 2.6–2.7 | Звук, критерий «5 минут атмосферы» | Готово |
+| **3. Ребаланс** | Урон / FILTH / окна хитбоксов / читаемость HIGH-баффа | **Следующее** |
+| 4. Масштабирование | Больше контента и систем за пределами одного среза | Далее |
 
-Песочница Core Loop: `Scenes/TestWorld.tscn` (не main).
+### DoD Vertical Slice (playtest ~5 мин)
+
+Маршрут: вход → Ichor Beast → Ash Walker → алтарь. Срез закрыт, если прогон подтверждает:
+
+- играет ambient (`Assets/Audio/HauntedLullabiesofJapan_Kazoe Uta (Tension).mp3`);
+- слышны swing / hit / footsteps / death / FILTH overload / altar;
+- у рыцаря виден zweihander в руках;
+- смерть → overlay **You Died** + кнопка **Restart** (не silent auto-reload);
+- main scene = `Scenes/Locations/FloodedCathedralSlice.tscn`;
+- визуально читается как Errengard (fog / ichor / altar).
+
+Credits: [`Assets/Audio/CREDITS.md`](Assets/Audio/CREDITS.md).
+
+Песочница Core Loop: `Scenes/TestWorld.tscn` (не main; удобна для ребаланса).
+
+### Перспективы (после ребаланса / при масштабировании)
+
+**Бой и прогрессия**
+- Ребаланс урона, FILTH gain/decay, порогов HIGH / OVERLOAD.
+- Явнее связать урон со скверной (множители уже есть — донастроить и показать в UI).
+- Анимации получения урона с прерыванием атак (player + enemies).
+- 3D SFX врагов: шаги, рычания / телеграф-вой, смерть (spatial `AudioStreamPlayer3D`).
+
+**Снаряжение и враги**
+- Инвентарь: смена оружия / доспехов, статы предметов (срез остаётся на одном zweihänder до этого этапа).
+- Категории врагов: не все заражают FILTH; свои статы, пассивки, уязвимости.
+
+**Мир и RPG-системы**
+- Свободная 3D-камера (мышь), без фикса top-down — отдельный control-pass.
+- Дружественные NPC, диалоги, квесты, система отношений.
+- Цель: полноценная dark-fantasy Action-RPG в Errengard (см. [CONCEPT.md](CONCEPT.md)).
 
 ## Документация
 

@@ -26,6 +26,10 @@ public partial class Hitbox3D : Area3D
 	[Export]
 	public MeshInstance3D? DebugMesh { get; set; }
 
+	/// <summary>When false (default), active frames and telegraphs stay invisible in play.</summary>
+	[Export]
+	public bool ShowDebugVisual { get; set; }
+
 	private readonly HashSet<ulong> _hitInstanceIds = new();
 
 	public override void _Ready()
@@ -36,7 +40,10 @@ public partial class Hitbox3D : Area3D
 
 		OwnerRoot ??= GetOwnerOrNull<Node>() ?? GetParent();
 		DebugMesh ??= GetNodeOrNull<MeshInstance3D>("DebugMesh");
-		SetDebugVisible(false);
+		if (DebugMesh != null)
+		{
+			DebugMesh.Visible = false;
+		}
 	}
 
 	public void SetActive(bool active)
@@ -47,7 +54,7 @@ public partial class Hitbox3D : Area3D
 		}
 
 		Monitoring = active;
-		SetDebugVisible(active);
+		SetDebugVisible(active && ShowDebugVisual);
 
 		if (!active)
 		{
@@ -63,7 +70,7 @@ public partial class Hitbox3D : Area3D
 	/// <summary>Показать/скрыть debug-меш без включения урона (телеграф игрока).</summary>
 	public void SetDebugVisiblePublic(bool visible)
 	{
-		SetDebugVisible(visible);
+		SetDebugVisible(visible && ShowDebugVisual);
 	}
 
 	private void OnBodyEntered(Node3D body)
@@ -103,6 +110,15 @@ public partial class Hitbox3D : Area3D
 		}
 
 		ApplyKnockback(body, source);
+
+		// Weapon impact only when the player (or ally) lands a hit — player-hurt SFX is handled on Player.
+		if (body is not Player)
+		{
+			GameAudio.Instance?.PlaySfxOneShot(
+				SliceAudioIds.Pick(SliceAudioIds.SwordHits),
+				volumeDbOffset: -2f,
+				pitchScale: 0.95f + GD.Randf() * 0.1f);
+		}
 
 		if (HitStopSeconds > 0f)
 		{
