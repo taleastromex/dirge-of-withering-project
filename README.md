@@ -188,7 +188,7 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 3.3 | FILTH только с `Hitbox.FilthPerDamage`; HUD × множитель | Готово |
 | 3.4 | Docs / playtest DoD ребаланса | Готово |
 | **4.1 Combat feel** | Hurt + interrupt атак; 3D SFX врагов (шаги / телеграф / смерть) | Готово |
-| 4.2 Enemy taxonomy | Категории Distorted/Human/Undead; +1–2 архетипа (Thief/Bandit) | Далее |
+| **4.2 Enemy taxonomy** | Категории Distorted/Human/Undead; Bandit + Cursed Knight; NPC↔NPC | Готово |
 | 4.3 Loadout | Мин. инвентарь: 2 оружия или оружие+доспех, статы, UI слотов | Далее |
 | 4.4 World expand | Вторая зона / крыло; переход; повтор алтаря/луж | Далее |
 | 4.5 NPC / RPG | 1 нейтрал + диалог/квест-заглушка; Filth Level vs боевой FILTH | Далее |
@@ -199,7 +199,7 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | Подэтап | Критерий готовности |
 |---------|---------------------|
 | 4.1 | Удар сбивает swing (hurt); враги слышны на дистанции (шаги/вой/смерть) |
-| 4.2 | ≥3 архетипа в срезе; люди не дают FILTH; TTK у якоря этапа 3 |
+| 4.2 | ≥3 архетипа в срезе; люди/нежить не дают FILTH; Distorted agro всех кроме Distorted; NPC↔NPC |
 | 4.3 | Смена loadout меняет N/resist; видно в UI |
 | 4.4 | Playtest ~10 мин: собор → новая зона → алтарь |
 | 4.5 | Нейтрал: пройти / поговорить / (флаг) сделать врагом |

@@ -28,6 +28,10 @@ public partial class PlayerAttack : Node
 	[Export]
 	public PlayerAnimDriver? AnimDriver { get; set; }
 
+	/// <summary>When false, ignore attack input (grip tune).</summary>
+	[Export]
+	public bool AttackEnabled { get; set; } = true;
+
 	/// <summary>Запас, если клип ещё не готов (сек).</summary>
 	[Export]
 	public float AttackFallbackDuration { get; set; } = 1.2f;
@@ -119,6 +123,11 @@ public partial class PlayerAttack : Node
 		switch (_phase)
 		{
 			case AttackPhase.Idle:
+				if (!AttackEnabled)
+				{
+					break;
+				}
+
 				if (AnimDriver != null && AnimDriver.IsHurt)
 				{
 					break;

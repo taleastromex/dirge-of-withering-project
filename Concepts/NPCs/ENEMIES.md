@@ -17,3 +17,4 @@
 ### Нежить
 
 - [Ghoul](./Enemies/undead/ghoul.md)
+- [Cursed Knight](./Neutral/undead/cursed-knight.md) — в каноне нейтрал; **в срезе 4.2 спавнится враждебным** (см. `Scenes/Enemy/CursedKnight.tscn`)

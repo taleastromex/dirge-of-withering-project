@@ -1,0 +1,129 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Enemy/BasicEnemy.cs" id="1_enemy"]
+[ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
+[ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="3_hitbox"]
+[ext_resource type="Script" path="res://Scripts/Enemy/EnemyAnimDriver.cs" id="4_anim"]
+[ext_resource type="PackedScene" path="res://Assets/ThirdParty/HumanHostiles/Processed/Bandit.glb" id="5_model"]
+[ext_resource type="Script" path="res://Scripts/UI/EnemyNameplate.cs" id="6_plate"]
+[ext_resource type="Script" path="res://Scripts/Combat/WeaponAttach3D.cs" id="7_weapon"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.4
+height = 1.65
+
+[sub_resource type="BoxShape3D" id="BoxShape_hitbox"]
+size = Vector3(0.9, 0.75, 0.95)
+
+[sub_resource type="StandardMaterial3D" id="Mat_hitbox_debug"]
+transparency = 1
+albedo_color = Color(0.75, 0.55, 0.2, 0.35)
+roughness = 1.0
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_hitbox_debug"]
+size = Vector3(0.9, 0.75, 0.95)
+
+[node name="Bandit" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_enemy")
+DisplayName = "Bandit"
+Category = 1
+AiEnabled = true
+MoveSpeed = 3.2
+DetectRange = 12.0
+AttackRange = 1.55
+TelegraphTime = 0.22
+RecoveryTime = 0.28
+StaggerTime = 0.28
+AttackDamage = 60
+AttackKnockback = 7.5
+DeathDespawnDelay = 4.5
+HighBlightSpeedMul = 1.15
+HighBlightTelegraphMul = 0.8
+AttackFallbackDuration = 0.75
+FaceTurnSpeed = 8.0
+AshTint = Color(0.92, 0.88, 0.82, 1)
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+MaxHealth = 140
+PhysicalResist = 0.0
+InvulnerabilityDuration = 0.12
+
+[node name="AnimDriver" type="Node" parent="."]
+script = ExtResource("4_anim")
+IdleClip = "idle"
+ChaseClip = "run"
+TelegraphClip = "idle"
+AttackClip = "attack"
+AttackAltClip = "attack_alt"
+StaggerClip = "stagger"
+DeathClip = "death"
+DeathAltClip = "death_alt"
+DeathExplosiveClip = "death_flyback"
+DeathSpeedScale = 1.0
+AttackSpeedScale = 1.4
+AttackHitNormStart = 0.38
+AttackHitNormEnd = 0.55
+AttackAltHitNormStart = 0.32
+AttackAltHitNormEnd = 0.5
+
+[node name="WeaponAttach" type="Node" parent="." node_paths=PackedStringArray("EnemyAnim")]
+script = ExtResource("7_weapon")
+ModelPath = NodePath("../Visual/Model")
+BoneName = "mixamorig:RightHand"
+WeaponPath = "res://Assets/ThirdParty/Weapons/one-handed-axe/Processed/BanditAxe.glb"
+WeaponNodeName = "BanditAxe"
+TargetLengthMeters = 0.85
+GripLocalPosition = Vector3(-0.01, 0.14, 0.01)
+GripLocalRotationDegrees = Vector3(240, 90, 270)
+StrikeGripLocalRotationDegrees = Vector3(240, 90, 270)
+BladeSlideMeters = 0.28
+StrikeBladeSlideMeters = 0.2
+SlideLocalAxis = Vector3(1, 0, 0)
+MeshPreRotationDegrees = Vector3(180, 0, 0)
+AutoAlignBladeEdge = false
+GripTuneMode = false
+AlignLongestAxisToX = false
+RecenterGripToPommel = false
+EnemyAnim = NodePath("../AnimDriver")
+
+[node name="Nameplate" type="Node3D" parent="."]
+script = ExtResource("6_plate")
+Title = "Bandit"
+HeightOffset = 1.95
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Model" parent="Visual" instance=ExtResource("5_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Hitbox" type="Area3D" parent="Visual" node_paths=PackedStringArray("OwnerRoot", "DebugMesh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.8)
+collision_layer = 0
+collision_mask = 6
+monitorable = false
+monitoring = false
+script = ExtResource("3_hitbox")
+Damage = 60
+FilthPerDamage = 0.0
+PhysicalResistIgnore = 0.2
+KnockbackForce = 7.5
+HitStopSeconds = 0.05
+OwnerRoot = NodePath("../..")
+DebugMesh = NodePath("DebugMesh")
+ShowDebugVisual = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
+shape = SubResource("BoxShape_hitbox")
+
+[node name="DebugMesh" type="MeshInstance3D" parent="Visual/Hitbox"]
+visible = false
+mesh = SubResource("BoxMesh_hitbox_debug")
+surface_material_override/0 = SubResource("Mat_hitbox_debug")

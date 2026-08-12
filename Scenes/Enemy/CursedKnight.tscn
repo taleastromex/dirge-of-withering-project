@@ -1,0 +1,122 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Enemy/BasicEnemy.cs" id="1_enemy"]
+[ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
+[ext_resource type="Script" path="res://Scripts/Combat/Hitbox3D.cs" id="3_hitbox"]
+[ext_resource type="Script" path="res://Scripts/Enemy/EnemyAnimDriver.cs" id="4_anim"]
+[ext_resource type="PackedScene" path="res://Assets/ThirdParty/BloodKnight/Processed/BloodKnight.glb" id="5_model"]
+[ext_resource type="Script" path="res://Scripts/UI/EnemyNameplate.cs" id="6_plate"]
+[ext_resource type="Script" path="res://Scripts/Combat/WeaponAttach3D.cs" id="7_weapon"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.45
+height = 1.8
+
+[sub_resource type="BoxShape3D" id="BoxShape_hitbox"]
+size = Vector3(1.05, 0.85, 1.15)
+
+[sub_resource type="StandardMaterial3D" id="Mat_hitbox_debug"]
+transparency = 1
+albedo_color = Color(0.45, 0.2, 0.55, 0.35)
+roughness = 1.0
+shading_mode = 0
+
+[sub_resource type="BoxMesh" id="BoxMesh_hitbox_debug"]
+size = Vector3(1.05, 0.85, 1.15)
+
+[node name="CursedKnight" type="CharacterBody3D" groups=["enemies"]]
+collision_layer = 4
+collision_mask = 1
+script = ExtResource("1_enemy")
+DisplayName = "Cursed Knight"
+Category = 2
+MoveSpeed = 2.85
+DetectRange = 13.0
+AttackRange = 1.75
+TelegraphTime = 0.4
+RecoveryTime = 0.5
+StaggerTime = 0.35
+AttackDamage = 100
+AttackKnockback = 9.0
+DeathDespawnDelay = 3.5
+HighBlightSpeedMul = 1.1
+HighBlightTelegraphMul = 0.9
+AttackFallbackDuration = 1.15
+FaceTurnSpeed = 6.5
+AshTint = Color(0.55, 0.62, 0.78, 1)
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+MaxHealth = 280
+PhysicalResist = 0.25
+InvulnerabilityDuration = 0.12
+
+[node name="AnimDriver" type="Node" parent="."]
+script = ExtResource("4_anim")
+IdleClip = "idle"
+ChaseClip = "run"
+TelegraphClip = "idle"
+AttackClip = "attack"
+AttackHeavyClip = "attack_heavy"
+StaggerClip = "stagger"
+DeathClip = "death"
+DeathAltClip = "death_alt"
+DeathDyingClip = "death_dying"
+DeathExplosiveClip = "death_flyback"
+DeathSpeedScale = 1.0
+AttackHitNormStart = 0.42
+AttackHitNormEnd = 0.58
+AttackHeavyHitNormStart = 0.45
+AttackHeavyHitNormEnd = 0.62
+
+[node name="WeaponAttach" type="Node" parent="." node_paths=PackedStringArray("EnemyAnim")]
+script = ExtResource("7_weapon")
+ModelPath = NodePath("../Visual/Model")
+BoneName = "mixamorig:RightHand"
+WeaponPath = "res://Assets/ThirdParty/Weapons/zweihander.glb"
+WeaponNodeName = "Zweihander"
+TargetLengthMeters = 1.65
+GripLocalPosition = Vector3(0, 0.06, -0.03)
+GripLocalRotationDegrees = Vector3(225, 0, -90)
+StrikeGripLocalRotationDegrees = Vector3(160, 0, -90)
+BladeSlideMeters = 0.32
+StrikeBladeSlideMeters = 0.22
+EnemyAnim = NodePath("../AnimDriver")
+
+[node name="Nameplate" type="Node3D" parent="."]
+script = ExtResource("6_plate")
+Title = "Cursed Knight"
+HeightOffset = 2.15
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.92, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="Visual" type="Node3D" parent="."]
+
+[node name="Model" parent="Visual" instance=ExtResource("5_model")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+
+[node name="Hitbox" type="Area3D" parent="Visual" node_paths=PackedStringArray("OwnerRoot", "DebugMesh")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, -0.95)
+collision_layer = 0
+collision_mask = 6
+monitorable = false
+monitoring = false
+script = ExtResource("3_hitbox")
+Damage = 100
+FilthPerDamage = 0.0
+LifestealFraction = 0.2
+KnockbackForce = 9.0
+HitStopSeconds = 0.055
+OwnerRoot = NodePath("../..")
+DebugMesh = NodePath("DebugMesh")
+ShowDebugVisual = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
+shape = SubResource("BoxShape_hitbox")
+
+[node name="DebugMesh" type="MeshInstance3D" parent="Visual/Hitbox"]
+visible = false
+mesh = SubResource("BoxMesh_hitbox_debug")
+surface_material_override/0 = SubResource("Mat_hitbox_debug")

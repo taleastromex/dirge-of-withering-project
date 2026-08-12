@@ -29,7 +29,14 @@ public partial class Player : CharacterBody3D
 	public Health? Health { get; set; }
 
 	[Export]
+	public NpcCategory Category { get; set; } = NpcCategory.Human;
+
+	[Export]
 	public PlayerAttack? Attack { get; set; }
+
+	/// <summary>When false, skip move / aim-driven locomotion (grip tune).</summary>
+	[Export]
+	public bool ControlEnabled { get; set; } = true;
 
 	[Export]
 	public BlightController? BlightController { get; set; }
@@ -121,6 +128,16 @@ public partial class Player : CharacterBody3D
 		}
 
 		_camera ??= GetViewport().GetCamera3D();
+
+		if (!ControlEnabled)
+		{
+			Velocity = Vector3.Zero;
+			MoveAndSlide();
+			ApplyVerticalLock();
+			AnimDriver?.UpdateLocomotion(0f);
+			return;
+		}
+
 		HandleAiming();
 
 		if (_hurtLockTimer > 0f)
@@ -319,7 +336,9 @@ public partial class Player : CharacterBody3D
 			return;
 		}
 
-		// Fatal hit: skip hurt — OnDied plays death immediately after.
+		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.PlayerHurt, volumeDbOffset: -6f, pitchScale: 1.05f);
+
+		// Fatal hit: skip hurt anim — OnDied plays death immediately after.
 		if (Health != null && Health.Current <= 0)
 		{
 			Attack?.Interrupt();
@@ -332,7 +351,6 @@ public partial class Player : CharacterBody3D
 
 		SetBodyColor(new Color(0.95f, 0.85f, 0.85f, 1f));
 		_flashTimer = 0.12f;
-		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.PlayerHurt, volumeDbOffset: -6f, pitchScale: 1.05f);
 	}
 
 	/// <summary>Визуал Скверны: emission нарастает с шкалой.</summary>

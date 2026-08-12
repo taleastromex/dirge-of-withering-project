@@ -23,6 +23,13 @@ public partial class BasicEnemy : CharacterBody3D
 	public string DisplayName { get; set; } = "Enemy";
 
 	[Export]
+	public NpcCategory Category { get; set; } = NpcCategory.Distorted;
+
+	/// <summary>false — стоять на месте (grip-tune / debug).</summary>
+	[Export]
+	public bool AiEnabled { get; set; } = true;
+
+	[Export]
 	public float MoveSpeed { get; set; } = 3.35f;
 
 	[Export]
@@ -138,8 +145,12 @@ public partial class BasicEnemy : CharacterBody3D
 	private AiState _state = AiState.Idle;
 	private float _stateTimer;
 	private Node3D? _player;
+	private Node3D? _combatTarget;
+	private float _retargetTimer;
 	private readonly List<BaseMaterial3D> _tintedMaterials = new();
 	private readonly List<Color> _baseAlbedos = new();
+
+	private const float RetargetInterval = 0.3f;
 
 	private Vector3 _knockbackVelocity;
 	private float _knockbackTimer;
@@ -151,6 +162,10 @@ public partial class BasicEnemy : CharacterBody3D
 	private float _lungeTimer;
 	private float _lungeSpeed;
 	private Vector3 _lungeDir = Vector3.Forward;
+	private int _lastHitDamage;
+	private int _burstDamage;
+	private float _burstTimer;
+	private bool _forceExplosiveDeath;
 
 	/// <summary>Скорость опускания трупа к полу (м/с), если death без root motion по Y.</summary>
 	[Export]
@@ -159,6 +174,21 @@ public partial class BasicEnemy : CharacterBody3D
 	/// <summary>Зазор кости/пола, при котором труп считаем приземлённым в этом кадре.</summary>
 	[Export]
 	public float DeathFloorClearance { get; set; } = 0.04f;
+
+	/// <summary>Один удар ≥ этого урона → explosive death (flyback), если клип есть.</summary>
+	[Export]
+	public int ExplosiveDeathHitDamage { get; set; } = 75;
+
+	/// <summary>Сумма урона за окно BurstWindow → explosive death.</summary>
+	[Export]
+	public int ExplosiveDeathBurstDamage { get; set; } = 110;
+
+	[Export]
+	public float ExplosiveDeathBurstWindow { get; set; } = 0.45f;
+
+	/// <summary>Доля MaxHealth за один удар (≥) тоже даёт flyback.</summary>
+	[Export(PropertyHint.Range, "0.2,0.9,0.05")]
+	public float ExplosiveDeathHitFraction { get; set; } = 0.5f;
 
 	public override void _Ready()
 	{
@@ -176,6 +206,7 @@ public partial class BasicEnemy : CharacterBody3D
 		if (Hitbox != null)
 		{
 			Hitbox.OwnerRoot = this;
+			ApplyCategoryDefaults();
 			ApplyHitboxTuning();
 			Hitbox.SetActive(false);
 		}
@@ -189,6 +220,7 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		RetargetCombatTarget();
 		CallDeferred(MethodName.EnterIdle);
 	}
 
@@ -200,13 +232,45 @@ public partial class BasicEnemy : CharacterBody3D
 		{
 			if (_deathSettling)
 			{
-				SettleCorpseToGround(dt);
+				// Не тянем Visual вниз во время flyback — иначе «впечатывает» в пол.
+				if (AnimDriver == null || AnimDriver.IsDeathReadyToSettle())
+				{
+					if (AnimDriver != null && !AnimDriver.IsDeathPoseHeld)
+					{
+						AnimDriver.HoldDeathPose();
+					}
+
+					SettleCorpseToGround(dt);
+				}
 			}
 
 			return;
 		}
 
+		if (!AiEnabled)
+		{
+			Velocity = new Vector3(0f, Velocity.Y, 0f);
+			MoveAndSlide();
+			return;
+		}
+
 		_player ??= GetTree().GetFirstNodeInGroup("player") as Node3D;
+
+		if (_burstTimer > 0f)
+		{
+			_burstTimer -= dt;
+			if (_burstTimer <= 0f)
+			{
+				_burstDamage = 0;
+			}
+		}
+
+		_retargetTimer -= dt;
+		if (_retargetTimer <= 0f)
+		{
+			_retargetTimer = RetargetInterval;
+			RetargetCombatTarget();
+		}
 
 		if (_knockbackTimer > 0f)
 		{
@@ -232,20 +296,20 @@ public partial class BasicEnemy : CharacterBody3D
 		{
 			case AiState.Idle:
 				Velocity = new Vector3(0f, Velocity.Y, 0f);
-				if (IsPlayerInRange(DetectRange))
+				if (IsTargetInRange(DetectRange))
 				{
 					EnterChase();
 				}
 				break;
 
 			case AiState.Chase:
-				if (_player == null || !IsPlayerAlive())
+				if (_combatTarget == null || !IsTargetAlive())
 				{
 					EnterIdle();
 					break;
 				}
 
-				if (!IsPlayerInRange(DetectRange * 1.25f))
+				if (!IsTargetInRange(DetectRange * 1.25f))
 				{
 					EnterIdle();
 					break;
@@ -257,13 +321,13 @@ public partial class BasicEnemy : CharacterBody3D
 					break;
 				}
 
-				ChasePlayer(dt);
+				ChaseTarget(dt);
 				UpdateChaseFootsteps(dt);
 				break;
 
 			case AiState.Telegraph:
 				Velocity = new Vector3(0f, Velocity.Y, 0f);
-				FacePlayer(dt);
+				FaceTarget(dt);
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f)
 				{
@@ -273,11 +337,11 @@ public partial class BasicEnemy : CharacterBody3D
 
 			case AiState.Attack:
 				UpdateHeavyLunge(dt);
-				// Heavy leap commits facing at start — no mid-air turn toward a dodging player.
+				// Heavy leap commits facing at start — no mid-air turn toward a dodging target.
 				if (AnimDriver == null
 					|| AnimDriver.CurrentAttackVariant != EnemyAnimDriver.AttackVariant.Heavy)
 				{
-					FacePlayer(dt * 0.2f);
+					FaceTarget(dt * 0.2f);
 				}
 
 				UpdateAttackHitbox();
@@ -354,12 +418,12 @@ public partial class BasicEnemy : CharacterBody3D
 	private void BeginTelegraph()
 	{
 		_state = AiState.Telegraph;
-		float mul = PlayerHasHighBlight() ? HighBlightTelegraphMul : 1f;
+		float mul = TargetPlayerHasHighBlight() ? HighBlightTelegraphMul : 1f;
 		_stateTimer = TelegraphTime * mul;
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
-		FacePlayer(999f);
+		FaceTarget(999f);
 		AnimDriver?.PlayTelegraph();
 		UpdateNameplateVisibility();
 		GameAudio.Instance?.PlaySfx3D(
@@ -373,7 +437,7 @@ public partial class BasicEnemy : CharacterBody3D
 
 	private void BeginAttack()
 	{
-		float dist = DistanceToPlayer();
+		float dist = DistanceToTarget();
 		bool canLandHeavy = TryComputeHeavyLungeSpeed(dist, out float aimedLungeSpeed);
 		bool closeMelee = dist <= AttackRange * 1.12f;
 
@@ -388,7 +452,7 @@ public partial class BasicEnemy : CharacterBody3D
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
-		FacePlayer(999f);
+		FaceTarget(999f);
 
 		// С дальней дистанции имеет смысл только heavy; в упор — наоборот без него.
 		bool requireHeavy = canLandHeavy && !closeMelee;
@@ -411,13 +475,13 @@ public partial class BasicEnemy : CharacterBody3D
 		BeginHeavyLungeIfNeeded(aimedLungeSpeed);
 		UpdateNameplateVisibility();
 
-		float len = AnimDriver?.GetCurrentLength() ?? 0f;
+		float len = AnimDriver?.GetCurrentPlaybackSeconds() ?? 0f;
 		_stateTimer = len > 0.05f ? len : AttackFallbackDuration;
 	}
 
 	private bool ShouldBeginAttack()
 	{
-		float dist = DistanceToPlayer();
+		float dist = DistanceToTarget();
 		if (dist <= AttackRange)
 		{
 			return true;
@@ -502,8 +566,8 @@ public partial class BasicEnemy : CharacterBody3D
 			return;
 		}
 
-		// Пересчёт на момент старта удара (игрок мог сдвинуться на телеграфе).
-		float dist = DistanceToPlayer();
+		// Пересчёт на момент старта удара (цель могла сдвинуться на телеграфе).
+		float dist = DistanceToTarget();
 		if (!TryComputeHeavyLungeSpeed(dist, out float speed))
 		{
 			// Чуть вне окна — всё равно прыгаем с клампом, чтобы не отменять уже начатый heavy.
@@ -522,13 +586,13 @@ public partial class BasicEnemy : CharacterBody3D
 
 	private Vector3 ResolveLungeDirection()
 	{
-		if (_player != null && GodotObject.IsInstanceValid(_player))
+		if (_combatTarget != null && GodotObject.IsInstanceValid(_combatTarget))
 		{
-			Vector3 toPlayer = _player.GlobalPosition - GlobalPosition;
-			toPlayer.Y = 0f;
-			if (toPlayer.LengthSquared() > 0.0001f)
+			Vector3 toTarget = _combatTarget.GlobalPosition - GlobalPosition;
+			toTarget.Y = 0f;
+			if (toTarget.LengthSquared() > 0.0001f)
 			{
-				return toPlayer.Normalized();
+				return toTarget.Normalized();
 			}
 		}
 
@@ -610,7 +674,7 @@ public partial class BasicEnemy : CharacterBody3D
 
 	private void ResumeAfterInterrupt()
 	{
-		if (IsPlayerInRange(DetectRange))
+		if (IsTargetInRange(DetectRange))
 		{
 			EnterChase();
 		}
@@ -620,23 +684,23 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 	}
 
-	private void ChasePlayer(float dt)
+	private void ChaseTarget(float dt)
 	{
-		if (_player == null)
+		if (_combatTarget == null)
 		{
 			return;
 		}
 
-		Vector3 toPlayer = _player.GlobalPosition - GlobalPosition;
-		toPlayer.Y = 0f;
-		if (toPlayer.LengthSquared() < 0.0001f)
+		Vector3 toTarget = _combatTarget.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0f;
+		if (toTarget.LengthSquared() < 0.0001f)
 		{
 			Velocity = new Vector3(0f, Velocity.Y, 0f);
 			return;
 		}
 
-		Vector3 dir = toPlayer.Normalized();
-		float speed = MoveSpeed * (PlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
+		Vector3 dir = toTarget.Normalized();
+		float speed = MoveSpeed * (TargetPlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
 		Velocity = new Vector3(dir.X * speed, Velocity.Y, dir.Z * speed);
 		FaceDirection(dir, dt);
 	}
@@ -668,32 +732,33 @@ public partial class BasicEnemy : CharacterBody3D
 			unitSize: 3.5f);
 	}
 
-	private bool PlayerHasHighBlight()
+	/// <summary>HIGH blight buff only when the combat target is the player.</summary>
+	private bool TargetPlayerHasHighBlight()
 	{
-		if (_player == null)
+		if (_combatTarget is not Player)
 		{
 			return false;
 		}
 
-		Blight? blight = _player.GetNodeOrNull<Blight>("Blight");
+		Blight? blight = _combatTarget.GetNodeOrNull<Blight>("Blight");
 		return blight != null && blight.IsHigh;
 	}
 
-	private void FacePlayer(float dt)
+	private void FaceTarget(float dt)
 	{
-		if (_player == null)
+		if (_combatTarget == null)
 		{
 			return;
 		}
 
-		Vector3 toPlayer = _player.GlobalPosition - GlobalPosition;
-		toPlayer.Y = 0f;
-		if (toPlayer.LengthSquared() < 0.0001f)
+		Vector3 toTarget = _combatTarget.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0f;
+		if (toTarget.LengthSquared() < 0.0001f)
 		{
 			return;
 		}
 
-		FaceDirection(toPlayer.Normalized(), dt);
+		FaceDirection(toTarget.Normalized(), dt);
 	}
 
 	private void FaceDirection(Vector3 direction, float dt)
@@ -714,34 +779,99 @@ public partial class BasicEnemy : CharacterBody3D
 		Visual.GlobalTransform = new Transform3D(new Basis(blended), current.Origin);
 	}
 
-	private bool IsPlayerInRange(float range)
+	private bool IsTargetInRange(float range)
 	{
-		return _player != null && IsPlayerAlive() && DistanceToPlayer() <= range;
+		return _combatTarget != null && IsTargetAlive() && DistanceToTarget() <= range;
 	}
 
-	private bool IsPlayerAlive()
+	private bool IsTargetAlive()
 	{
-		if (_player == null)
+		if (_combatTarget == null || !GodotObject.IsInstanceValid(_combatTarget))
 		{
 			return false;
 		}
 
-		Health? playerHealth = _player.GetNodeOrNull<Health>("Health");
-		return playerHealth == null || !playerHealth.IsDead;
+		Health? targetHealth = _combatTarget.GetNodeOrNull<Health>("Health");
+		return targetHealth == null || !targetHealth.IsDead;
 	}
 
-	private float DistanceToPlayer()
+	private float DistanceToTarget()
 	{
-		if (_player == null)
+		if (_combatTarget == null)
 		{
 			return float.MaxValue;
 		}
 
 		Vector3 a = GlobalPosition;
-		Vector3 b = _player.GlobalPosition;
+		Vector3 b = _combatTarget.GlobalPosition;
 		a.Y = 0f;
 		b.Y = 0f;
 		return a.DistanceTo(b);
+	}
+
+	private void RetargetCombatTarget()
+	{
+		float maxRange = DetectRange * 1.25f;
+		float maxRangeSq = maxRange * maxRange;
+		Node3D? best = null;
+		float bestDistSq = float.MaxValue;
+
+		ConsiderCandidates(GetTree().GetNodesInGroup("player"), maxRangeSq, ref best, ref bestDistSq);
+		ConsiderCandidates(GetTree().GetNodesInGroup("enemies"), maxRangeSq, ref best, ref bestDistSq);
+
+		_combatTarget = best;
+	}
+
+	private void ConsiderCandidates(
+		Godot.Collections.Array<Node> nodes,
+		float maxRangeSq,
+		ref Node3D? best,
+		ref float bestDistSq)
+	{
+		foreach (Node node in nodes)
+		{
+			if (node is not Node3D candidate
+				|| !GodotObject.IsInstanceValid(candidate)
+				|| candidate == this)
+			{
+				continue;
+			}
+
+			if (!FactionRules.CanTarget(this, candidate))
+			{
+				continue;
+			}
+
+			Health? health = candidate.GetNodeOrNull<Health>("Health");
+			if (health != null && health.IsDead)
+			{
+				continue;
+			}
+
+			Vector3 a = GlobalPosition;
+			Vector3 b = candidate.GlobalPosition;
+			a.Y = 0f;
+			b.Y = 0f;
+			float distSq = a.DistanceSquaredTo(b);
+			if (distSq > maxRangeSq || distSq >= bestDistSq)
+			{
+				continue;
+			}
+
+			best = candidate;
+			bestDistSq = distSq;
+		}
+	}
+
+	private void ApplyCategoryDefaults()
+	{
+		if (Hitbox == null)
+		{
+			return;
+		}
+
+		Hitbox.FilthPerDamage = Category == NpcCategory.Distorted ? 0.5f : 0f;
+		Hitbox.LifestealFraction = Category == NpcCategory.Undead ? 0.2f : 0f;
 	}
 
 	private void ApplyAshTintToMeshes()
@@ -828,12 +958,41 @@ public partial class BasicEnemy : CharacterBody3D
 
 	private void OnDamaged(int amount, Vector3 sourcePosition)
 	{
-		if (_state == AiState.Dead)
+		_lastHitDamage = amount;
+		_burstDamage += amount;
+		_burstTimer = ExplosiveDeathBurstWindow;
+
+		if (_state == AiState.Dead || (Health != null && Health.IsDead))
 		{
 			return;
 		}
 
 		BeginStagger();
+	}
+
+	/// <summary>
+	/// Пометить следующую смерть как explosive (добивание / спецприём). Сбрасывается при PlayDeath.
+	/// </summary>
+	public void ArmExplosiveDeath()
+	{
+		_forceExplosiveDeath = true;
+	}
+
+	private bool ShouldPlayExplosiveDeath()
+	{
+		if (_forceExplosiveDeath)
+		{
+			return true;
+		}
+
+		int maxHp = Health?.MaxHealth ?? 100;
+		int fractionGate = Mathf.Max(1, Mathf.RoundToInt(maxHp * ExplosiveDeathHitFraction));
+		if (_lastHitDamage >= ExplosiveDeathHitDamage || _lastHitDamage >= fractionGate)
+		{
+			return true;
+		}
+
+		return _burstDamage >= ExplosiveDeathBurstDamage;
 	}
 
 	private void OnDied()
@@ -852,10 +1011,12 @@ public partial class BasicEnemy : CharacterBody3D
 		CollisionLayer = 0;
 		CollisionMask = 0;
 
+		bool explosive = ShouldPlayExplosiveDeath();
+		_forceExplosiveDeath = false;
+
 		if (AnimDriver != null)
 		{
-			AnimDriver.PlayDeath();
-			// Только пауза после доигрывания — без Seek в конец (он рвал анимацию).
+			AnimDriver.PlayDeath(explosive);
 		}
 		else if (Visual != null)
 		{
@@ -871,13 +1032,19 @@ public partial class BasicEnemy : CharacterBody3D
 			maxDistance: SpatialSfxMaxDistance,
 			unitSize: 6f);
 
-		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
+		float despawn = DeathDespawnDelay;
+		float animLen = AnimDriver?.GetCurrentLength() ?? 0f;
+		if (animLen > 0.05f)
+		{
+			despawn = Mathf.Max(despawn, animLen + 0.6f);
+		}
+
+		GetTree().CreateTimer(despawn).Timeout += QueueFree;
 	}
 
 	/// <summary>
-	/// Death без hips-Y оставляет лежащую позу на высоте стоячих бёдер.
-	/// AABB скин-меша врёт (rest pose) — меряем кости и опускаем Visual каждый кадр,
-	/// пока анимация валит тело (не выключаем settle после первого «на полу»).
+	/// Подгоняет труп к полу после death-клипа: опускает, если висит в воздухе,
+	/// и поднимает, если root motion утащил под текстуру.
 	/// </summary>
 	private void SettleCorpseToGround(float dt)
 	{
@@ -896,12 +1063,13 @@ public partial class BasicEnemy : CharacterBody3D
 		}
 
 		float gap = bottomY - floorY;
-		if (gap <= 0f)
+		if (Mathf.Abs(gap) <= 0.02f)
 		{
 			return;
 		}
 
-		float step = Mathf.Min(gap, DeathSettleSpeed * dt);
+		// gap > 0 — слишком высоко (опускаем); gap < 0 — под полом (поднимаем).
+		float step = Mathf.Sign(gap) * Mathf.Min(Mathf.Abs(gap), DeathSettleSpeed * dt);
 		Visual.Position = new Vector3(
 			Visual.Position.X,
 			Visual.Position.Y - step,
