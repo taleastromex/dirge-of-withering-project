@@ -50,6 +50,38 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public float AttackHitStop { get; set; } = 0.045f;
 
+	/// <summary>Множитель урона для attack_heavy.</summary>
+	[Export]
+	public float HeavyAttackDamageMul { get; set; } = 1.35f;
+
+	/// <summary>Множитель knockback для attack_heavy.</summary>
+	[Export]
+	public float HeavyAttackKnockbackMul { get; set; } = 1.25f;
+
+	/// <summary>Множитель урона для attack_alt (быстрый удар).</summary>
+	[Export]
+	public float AltAttackDamageMul { get; set; } = 0.85f;
+
+	/// <summary>Длительность выпада вперёд на attack_heavy (прыжок).</summary>
+	[Export]
+	public float HeavyLungeDuration { get; set; } = 1.75f;
+
+	/// <summary>Базовая скорость выпада на attack_heavy (м/с); факт. скорость подгоняется под цель.</summary>
+	[Export]
+	public float HeavyLungeSpeed { get; set; } = 5.5f;
+
+	/// <summary>Нижняя граница множителя скорости выпада при прицеливании в хитбокс.</summary>
+	[Export(PropertyHint.Range, "0.1,1,0.05")]
+	public float HeavyLungeSpeedMinMul { get; set; } = 0.45f;
+
+	/// <summary>Верхняя граница множителя скорости выпада при прицеливании в хитбокс.</summary>
+	[Export(PropertyHint.Range, "1,2,0.05")]
+	public float HeavyLungeSpeedMaxMul { get; set; } = 1.2f;
+
+	/// <summary>Шанс взять heavy, когда дистанция позволяет попасть хитбоксом.</summary>
+	[Export(PropertyHint.Range, "0,1,0.05")]
+	public float HeavyAttackPreferChance { get; set; } = 0.7f;
+
 	[Export]
 	public float KnockbackDuration { get; set; } = 0.14f;
 
@@ -94,6 +126,15 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public EnemyNameplate? Nameplate { get; set; }
 
+	[Export]
+	public float FootstepInterval { get; set; } = 0.48f;
+
+	[Export]
+	public float FootstepMinSpeed { get; set; } = 0.55f;
+
+	[Export]
+	public float SpatialSfxMaxDistance { get; set; } = 24f;
+
 	private AiState _state = AiState.Idle;
 	private float _stateTimer;
 	private Node3D? _player;
@@ -106,10 +147,14 @@ public partial class BasicEnemy : CharacterBody3D
 	private bool _deathSettling;
 	private float _deathGroundOffsetApplied;
 	private Skeleton3D? _deathSkeleton;
+	private float _footstepTimer;
+	private float _lungeTimer;
+	private float _lungeSpeed;
+	private Vector3 _lungeDir = Vector3.Forward;
 
 	/// <summary>Скорость опускания трупа к полу (м/с), если death без root motion по Y.</summary>
 	[Export]
-	public float DeathSettleSpeed { get; set; } = 4.5f;
+	public float DeathSettleSpeed { get; set; } = 7.5f;
 
 	/// <summary>Зазор кости/пола, при котором труп считаем приземлённым в этом кадре.</summary>
 	[Export]
@@ -206,13 +251,14 @@ public partial class BasicEnemy : CharacterBody3D
 					break;
 				}
 
-				if (DistanceToPlayer() <= AttackRange)
+				if (ShouldBeginAttack())
 				{
 					BeginTelegraph();
 					break;
 				}
 
 				ChasePlayer(dt);
+				UpdateChaseFootsteps(dt);
 				break;
 
 			case AiState.Telegraph:
@@ -226,8 +272,14 @@ public partial class BasicEnemy : CharacterBody3D
 				break;
 
 			case AiState.Attack:
-				Velocity = new Vector3(0f, Velocity.Y, 0f);
-				FacePlayer(dt * 0.35f);
+				UpdateHeavyLunge(dt);
+				// Heavy leap commits facing at start — no mid-air turn toward a dodging player.
+				if (AnimDriver == null
+					|| AnimDriver.CurrentAttackVariant != EnemyAnimDriver.AttackVariant.Heavy)
+				{
+					FacePlayer(dt * 0.2f);
+				}
+
 				UpdateAttackHitbox();
 				_stateTimer -= dt;
 				if (_stateTimer <= 0f || (AnimDriver?.IsAttackFinished() ?? false))
@@ -310,21 +362,200 @@ public partial class BasicEnemy : CharacterBody3D
 		FacePlayer(999f);
 		AnimDriver?.PlayTelegraph();
 		UpdateNameplateVisibility();
+		GameAudio.Instance?.PlaySfx3D(
+			this,
+			SliceAudioIds.Pick(SliceAudioIds.EnemyTelegraphGrowls),
+			volumeDbOffset: -4f,
+			pitchScale: 0.62f + GD.Randf() * 0.12f,
+			maxDistance: SpatialSfxMaxDistance,
+			unitSize: 5f);
 	}
 
 	private void BeginAttack()
 	{
+		float dist = DistanceToPlayer();
+		bool canLandHeavy = TryComputeHeavyLungeSpeed(dist, out float aimedLungeSpeed);
+		bool closeMelee = dist <= AttackRange * 1.12f;
+
+		// Зашли в телеграф ради прыжка, но прицел уже не сходится — снова в chase.
+		if (!closeMelee && !canLandHeavy)
+		{
+			EnterChase();
+			return;
+		}
+
 		_state = AiState.Attack;
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		FacePlayer(999f);
+
+		// С дальней дистанции имеет смысл только heavy; в упор — наоборот без него.
+		bool requireHeavy = canLandHeavy && !closeMelee;
+		AnimDriver?.PlayAttack(
+			allowHeavy: canLandHeavy,
+			preferHeavy: canLandHeavy,
+			preferChance: HeavyAttackPreferChance,
+			requireHeavy: requireHeavy);
+
+		if (requireHeavy
+			&& AnimDriver != null
+			&& AnimDriver.CurrentAttackVariant != EnemyAnimDriver.AttackVariant.Heavy)
+		{
+			// Клипа нет / не выбрался — не бьём «в воздух» обычным ударом.
+			EnterChase();
+			return;
+		}
+
 		ApplyHitboxTuning();
-		AnimDriver?.PlayAttack();
+		BeginHeavyLungeIfNeeded(aimedLungeSpeed);
 		UpdateNameplateVisibility();
 
 		float len = AnimDriver?.GetCurrentLength() ?? 0f;
 		_stateTimer = len > 0.05f ? len : AttackFallbackDuration;
+	}
+
+	private bool ShouldBeginAttack()
+	{
+		float dist = DistanceToPlayer();
+		if (dist <= AttackRange)
+		{
+			return true;
+		}
+
+		// Прыжок — только если хитбокс реально можно положить на цель.
+		return TryComputeHeavyLungeSpeed(dist, out _);
+	}
+
+	/// <summary>
+	/// Считает скорость выпада так, чтобы к концу лунжа центр хитбокса оказался на текущей дистанции до цели.
+	/// Путь лунжа: ∫ V·SmoothStep = 0.5·speed·duration.
+	/// </summary>
+	private bool TryComputeHeavyLungeSpeed(float distanceToTarget, out float lungeSpeed)
+	{
+		lungeSpeed = 0f;
+		if (AnimDriver == null || !AnimDriver.HasHeavyAttackClip())
+		{
+			return false;
+		}
+
+		if (HeavyLungeDuration <= 0.05f || HeavyLungeSpeed <= 0.05f)
+		{
+			return false;
+		}
+
+		float hitboxForward = GetHitboxForwardOffset();
+		// Нужный пробег тела: центр хитбокса → позиция цели.
+		float desiredTravel = distanceToTarget - hitboxForward;
+		float minTravel = GetHitboxHalfExtentForward() * 0.35f;
+		if (desiredTravel < minTravel)
+		{
+			return false;
+		}
+
+		// travel = 0.5 * speed * duration  →  speed = 2 * travel / duration
+		float speed = (desiredTravel * 2f) / HeavyLungeDuration;
+		float minSpeed = HeavyLungeSpeed * HeavyLungeSpeedMinMul;
+		float maxSpeed = HeavyLungeSpeed * HeavyLungeSpeedMaxMul;
+		if (speed < minSpeed || speed > maxSpeed)
+		{
+			return false;
+		}
+
+		lungeSpeed = speed;
+		return true;
+	}
+
+	private float GetHitboxForwardOffset()
+	{
+		if (Hitbox == null)
+		{
+			return 1.15f;
+		}
+
+		// Visual смотрит в -Z; хитбокс стоит впереди по локальному -Z.
+		return Mathf.Abs(Hitbox.Position.Z);
+	}
+
+	private float GetHitboxHalfExtentForward()
+	{
+		CollisionShape3D? shapeNode = Hitbox?.GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
+		if (shapeNode?.Shape is BoxShape3D box)
+		{
+			return box.Size.Z * 0.5f;
+		}
+
+		return 0.7f;
+	}
+
+	private void BeginHeavyLungeIfNeeded(float aimedLungeSpeed)
+	{
+		_lungeTimer = 0f;
+		_lungeSpeed = 0f;
+		if (AnimDriver == null || AnimDriver.CurrentAttackVariant != EnemyAnimDriver.AttackVariant.Heavy)
+		{
+			return;
+		}
+
+		if (HeavyLungeDuration <= 0f || aimedLungeSpeed <= 0f)
+		{
+			return;
+		}
+
+		// Пересчёт на момент старта удара (игрок мог сдвинуться на телеграфе).
+		float dist = DistanceToPlayer();
+		if (!TryComputeHeavyLungeSpeed(dist, out float speed))
+		{
+			// Чуть вне окна — всё равно прыгаем с клампом, чтобы не отменять уже начатый heavy.
+			float hitboxForward = GetHitboxForwardOffset();
+			float desiredTravel = Mathf.Max(0.35f, dist - hitboxForward);
+			speed = Mathf.Clamp(
+				(desiredTravel * 2f) / HeavyLungeDuration,
+				HeavyLungeSpeed * HeavyLungeSpeedMinMul,
+				HeavyLungeSpeed * HeavyLungeSpeedMaxMul);
+		}
+
+		_lungeDir = ResolveLungeDirection();
+		_lungeSpeed = speed;
+		_lungeTimer = HeavyLungeDuration;
+	}
+
+	private Vector3 ResolveLungeDirection()
+	{
+		if (_player != null && GodotObject.IsInstanceValid(_player))
+		{
+			Vector3 toPlayer = _player.GlobalPosition - GlobalPosition;
+			toPlayer.Y = 0f;
+			if (toPlayer.LengthSquared() > 0.0001f)
+			{
+				return toPlayer.Normalized();
+			}
+		}
+
+		Node3D face = Visual ?? this;
+		Vector3 forward = -face.GlobalTransform.Basis.Z;
+		forward.Y = 0f;
+		if (forward.LengthSquared() < 0.0001f)
+		{
+			return Vector3.Forward;
+		}
+
+		return forward.Normalized();
+	}
+
+	private void UpdateHeavyLunge(float dt)
+	{
+		if (_lungeTimer <= 0f)
+		{
+			Velocity = new Vector3(0f, Velocity.Y, 0f);
+			return;
+		}
+
+		_lungeTimer -= dt;
+		// Ease out: к концу выпада тело останавливается, хитбокс должен лежать на цели.
+		float t = Mathf.Clamp(_lungeTimer / Mathf.Max(0.01f, HeavyLungeDuration), 0f, 1f);
+		float speed = _lungeSpeed * Mathf.SmoothStep(0f, 1f, t);
+		Velocity = new Vector3(_lungeDir.X * speed, Velocity.Y, _lungeDir.Z * speed);
 	}
 
 	private void UpdateAttackHitbox()
@@ -348,8 +579,10 @@ public partial class BasicEnemy : CharacterBody3D
 	{
 		_state = AiState.Recovery;
 		_stateTimer = RecoveryTime;
+		_lungeTimer = 0f;
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
+		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		RestoreTint();
 		AnimDriver?.PlayIdle();
 		UpdateNameplateVisibility();
@@ -359,8 +592,10 @@ public partial class BasicEnemy : CharacterBody3D
 	{
 		_state = AiState.Stagger;
 		_stateTimer = StaggerTime;
+		_lungeTimer = 0f;
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
+		Velocity = new Vector3(0f, Velocity.Y, 0f);
 		ApplyStaggerTint();
 		AnimDriver?.PlayStagger();
 		UpdateNameplateVisibility();
@@ -404,6 +639,33 @@ public partial class BasicEnemy : CharacterBody3D
 		float speed = MoveSpeed * (PlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
 		Velocity = new Vector3(dir.X * speed, Velocity.Y, dir.Z * speed);
 		FaceDirection(dir, dt);
+	}
+
+	private void UpdateChaseFootsteps(float dt)
+	{
+		Vector3 planar = new(Velocity.X, 0f, Velocity.Z);
+		float speed = planar.Length();
+		if (speed < FootstepMinSpeed)
+		{
+			_footstepTimer = 0f;
+			return;
+		}
+
+		float interval = FootstepInterval * Mathf.Clamp(MoveSpeed / Mathf.Max(speed, 0.01f), 0.6f, 1.35f);
+		_footstepTimer -= dt;
+		if (_footstepTimer > 0f)
+		{
+			return;
+		}
+
+		_footstepTimer = interval;
+		GameAudio.Instance?.PlaySfx3D(
+			this,
+			SliceAudioIds.Pick(SliceAudioIds.FootstepsConcrete),
+			volumeDbOffset: -8f,
+			pitchScale: 0.78f + GD.Randf() * 0.14f,
+			maxDistance: SpatialSfxMaxDistance * 0.85f,
+			unitSize: 3.5f);
 	}
 
 	private bool PlayerHasHighBlight()
@@ -543,8 +805,24 @@ public partial class BasicEnemy : CharacterBody3D
 			return;
 		}
 
-		Hitbox.Damage = AttackDamage;
-		Hitbox.KnockbackForce = AttackKnockback;
+		float dmgMul = 1f;
+		float kbMul = 1f;
+		if (AnimDriver != null)
+		{
+			switch (AnimDriver.CurrentAttackVariant)
+			{
+				case EnemyAnimDriver.AttackVariant.Alt:
+					dmgMul = AltAttackDamageMul;
+					break;
+				case EnemyAnimDriver.AttackVariant.Heavy:
+					dmgMul = HeavyAttackDamageMul;
+					kbMul = HeavyAttackKnockbackMul;
+					break;
+			}
+		}
+
+		Hitbox.Damage = Mathf.Max(1, Mathf.RoundToInt(AttackDamage * dmgMul));
+		Hitbox.KnockbackForce = AttackKnockback * kbMul;
 		Hitbox.HitStopSeconds = AttackHitStop;
 	}
 
@@ -563,6 +841,7 @@ public partial class BasicEnemy : CharacterBody3D
 		_state = AiState.Dead;
 		Velocity = Vector3.Zero;
 		_knockbackTimer = 0f;
+		_lungeTimer = 0f;
 		_hitboxWasActive = false;
 		_deathSettling = true;
 		_deathGroundOffsetApplied = 0f;
@@ -584,10 +863,13 @@ public partial class BasicEnemy : CharacterBody3D
 			_deathSettling = false;
 		}
 
-		GameAudio.Instance?.PlaySfxOneShot(
+		GameAudio.Instance?.PlaySfx3D(
+			this,
 			SliceAudioIds.EnemyDeath,
-			volumeDbOffset: -3f,
-			pitchScale: 0.9f + GD.Randf() * 0.2f);
+			volumeDbOffset: -2f,
+			pitchScale: 0.85f + GD.Randf() * 0.2f,
+			maxDistance: SpatialSfxMaxDistance,
+			unitSize: 6f);
 
 		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
 	}

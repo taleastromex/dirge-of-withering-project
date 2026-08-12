@@ -63,6 +63,10 @@ public partial class Player : CharacterBody3D
 	[Export]
 	public float FootstepMinSpeed { get; set; } = 0.6f;
 
+	/// <summary>Длительность hurt-лока движения (клип ускоряется отдельно в AnimDriver).</summary>
+	[Export]
+	public float HurtLockSeconds { get; set; } = 0.18f;
+
 	private Camera3D? _camera;
 	private Vector3 _aimForward = Vector3.Forward;
 	private bool _isDead;
@@ -70,6 +74,7 @@ public partial class Player : CharacterBody3D
 	private Vector3 _knockbackVelocity;
 	private float _knockbackTimer;
 	private float _footstepTimer;
+	private float _hurtLockTimer;
 
 	private readonly System.Collections.Generic.List<StandardMaterial3D> _bodyMaterials = new();
 	private Color _baseColor = new(0.55f, 0.18f, 0.22f, 1f);
@@ -118,11 +123,24 @@ public partial class Player : CharacterBody3D
 		_camera ??= GetViewport().GetCamera3D();
 		HandleAiming();
 
+		if (_hurtLockTimer > 0f)
+		{
+			_hurtLockTimer -= dt;
+		}
+
 		if (_knockbackTimer > 0f)
 		{
 			_knockbackTimer -= dt;
 			Velocity = new Vector3(_knockbackVelocity.X, Velocity.Y, _knockbackVelocity.Z);
 			_knockbackVelocity = _knockbackVelocity.MoveToward(Vector3.Zero, 40f * dt);
+			MoveAndSlide();
+			ApplyVerticalLock();
+			return;
+		}
+
+		if (_hurtLockTimer > 0f || (AnimDriver != null && AnimDriver.IsHurt))
+		{
+			Velocity = new Vector3(0f, Velocity.Y, 0f);
 			MoveAndSlide();
 			ApplyVerticalLock();
 			return;
@@ -296,8 +314,24 @@ public partial class Player : CharacterBody3D
 
 	private void OnDamaged(int amount, Vector3 sourcePosition)
 	{
+		if (_isDead)
+		{
+			return;
+		}
+
+		// Fatal hit: skip hurt — OnDied plays death immediately after.
+		if (Health != null && Health.Current <= 0)
+		{
+			Attack?.Interrupt();
+			return;
+		}
+
+		Attack?.Interrupt();
+		AnimDriver?.PlayHurt();
+		_hurtLockTimer = HurtLockSeconds;
+
 		SetBodyColor(new Color(0.95f, 0.85f, 0.85f, 1f));
-		_flashTimer = 0.1f;
+		_flashTimer = 0.12f;
 		GameAudio.Instance?.PlaySfxOneShot(SliceAudioIds.PlayerHurt, volumeDbOffset: -6f, pitchScale: 1.05f);
 	}
 

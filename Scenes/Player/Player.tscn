@@ -33,6 +33,7 @@ collision_mask = 1
 floor_stop_on_slope = false
 script = ExtResource("1_player")
 MoveSpeed = 4.0
+HurtLockSeconds = 0.18
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
@@ -78,7 +79,9 @@ WalkClip = "walk"
 RunClip = "run"
 AttackClip = "attack"
 HeavyAttackClip = "attack_heavy"
+HurtClip = "stagger"
 DeathClip = "death"
+HurtSpeedScale = 2.1
 RunSpeedThreshold = 2.2
 WalkReferenceSpeed = 1.35
 RunReferenceSpeed = 4.0
@@ -130,6 +133,7 @@ KnockbackForce = 9.0
 HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")
 DebugMesh = NodePath("DebugMesh")
+ShowDebugVisual = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
 shape = SubResource("BoxShape_hitbox")

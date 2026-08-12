@@ -137,7 +137,45 @@ public partial class GameAudio : Node
 		player.Play();
 	}
 
-	private AudioStream? LoadStream(string path)
+	/// <summary>
+	/// Spatial one-shot attached under <paramref name="host"/> (enemy footsteps / growls / death).
+	/// </summary>
+	public void PlaySfx3D(
+		Node3D host,
+		string path,
+		float volumeDbOffset = 0f,
+		float pitchScale = 1f,
+		float maxDistance = 22f,
+		float unitSize = 4f)
+	{
+		if (host == null || !GodotObject.IsInstanceValid(host))
+		{
+			return;
+		}
+
+		AudioStream? stream = LoadStream(path);
+		if (stream == null)
+		{
+			return;
+		}
+
+		var player = new AudioStreamPlayer3D
+		{
+			Bus = "SFX",
+			Stream = stream,
+			VolumeDb = SfxVolumeDb + volumeDbOffset,
+			PitchScale = Mathf.Clamp(pitchScale, 0.55f, 1.4f),
+			MaxDistance = maxDistance,
+			UnitSize = unitSize,
+			AttenuationFilterCutoffHz = 5000f,
+			MaxPolyphony = 4,
+		};
+		host.AddChild(player);
+		player.Finished += player.QueueFree;
+		player.Play();
+	}
+
+	public AudioStream? LoadStream(string path)
 	{
 		if (_cache.TryGetValue(path, out AudioStream? cached) && GodotObject.IsInstanceValid(cached))
 		{

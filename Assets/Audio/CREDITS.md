@@ -12,7 +12,8 @@ Placeholders for attribution — replace with exact license/source when known.
 - `SFX/Voiceline/Death/*` — player death vocal
 - `SFX/CombatAndGore/slap.wav` — player hurt
 - `SFX/CombatAndGore/squelching_1.wav` — enemy death
-- `SFX/Footsteps/foley_footstep_concrete_*.wav` — player footsteps
+- `SFX/Footsteps/foley_footstep_concrete_*.wav` — player + enemy (spatial) footsteps
+- `SFX/Voiceline/Actions/*` (pitched down) — enemy telegraph growls (placeholder)
 - `SFX/Death/death-sound.mp3` — player death sting
 - `SFX/Filth/filth-overload.mp3` — FILTH overload bell
 - `SFX/altar.mp3` — altar cleanse hum

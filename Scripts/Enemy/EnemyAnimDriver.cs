@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace DirgeOfWithering;
 
 /// <summary>
 /// Мост AI → AnimationPlayer. Локомоция лупится, бой нативным темпом, death держит позу.
+/// Атака может чередовать Attack / AttackAlt / AttackHeavy, если клипы заданы.
 /// </summary>
 public partial class EnemyAnimDriver : Node
 {
@@ -18,6 +20,13 @@ public partial class EnemyAnimDriver : Node
 		Death
 	}
 
+	public enum AttackVariant
+	{
+		Normal,
+		Alt,
+		Heavy
+	}
+
 	[Export]
 	public AnimationPlayer? AnimPlayer { get; set; }
 
@@ -25,22 +34,44 @@ public partial class EnemyAnimDriver : Node
 	[Export] public string ChaseClip { get; set; } = "run";
 	[Export] public string TelegraphClip { get; set; } = "stagger";
 	[Export] public string AttackClip { get; set; } = "attack";
+	[Export] public string AttackAltClip { get; set; } = "";
+	[Export] public string AttackHeavyClip { get; set; } = "";
 	[Export] public string StaggerClip { get; set; } = "stagger";
 	[Export] public string DeathClip { get; set; } = "death";
 
-	/// <summary>Доля длины attack-клипа, когда хитбокс активен (0..1).</summary>
+	/// <summary>Ускорение death — меньше «стоят перед падением».</summary>
+	[Export(PropertyHint.Range, "1,3,0.05")]
+	public float DeathSpeedScale { get; set; } = 1.85f;
+
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float AttackHitNormStart { get; set; } = 0.48f;
 
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float AttackHitNormEnd { get; set; } = 0.62f;
 
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float AttackAltHitNormStart { get; set; } = 0.40f;
+
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float AttackAltHitNormEnd { get; set; } = 0.58f;
+
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float AttackHeavyHitNormStart { get; set; } = 0.52f;
+
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float AttackHeavyHitNormEnd { get; set; } = 0.62f;
+
 	private AnimKind _kind = AnimKind.None;
 	private string _current = "";
 	private bool _bound;
 	private bool _deathPoseHeld;
+	private AttackVariant _attackVariant = AttackVariant.Normal;
+	private float _hitStart = 0.48f;
+	private float _hitEnd = 0.62f;
 
 	public AnimKind CurrentKind => _kind;
+
+	public AttackVariant CurrentAttackVariant => _attackVariant;
 
 	public override void _Ready()
 	{
@@ -63,6 +94,8 @@ public partial class EnemyAnimDriver : Node
 		ConfigureLoop(ChaseClip, loop: true);
 		ConfigureLoop(TelegraphClip, loop: false);
 		ConfigureLoop(AttackClip, loop: false);
+		ConfigureLoop(AttackAltClip, loop: false);
+		ConfigureLoop(AttackHeavyClip, loop: false);
 		ConfigureLoop(StaggerClip, loop: false);
 		ConfigureLoop(DeathClip, loop: false);
 		AnimPlayer.SpeedScale = 1f;
@@ -93,7 +126,19 @@ public partial class EnemyAnimDriver : Node
 		PlayKind(AnimKind.Telegraph, TelegraphClip, 0.1f, forceRestart: true);
 	}
 
-	public void PlayAttack()
+	public bool HasHeavyAttackClip()
+	{
+		return !string.IsNullOrWhiteSpace(AttackHeavyClip) && ResolveClip(AttackHeavyClip) != null;
+	}
+
+	/// <param name="allowHeavy">false — heavy выкидываем из пула (слишком близко/далеко).</param>
+	/// <param name="preferHeavy">true — с шансом preferChance берём heavy, если он в пуле.</param>
+	/// <param name="requireHeavy">true — только heavy; иначе не стартуем атаку-клип.</param>
+	public void PlayAttack(
+		bool allowHeavy = true,
+		bool preferHeavy = false,
+		float preferChance = 0.7f,
+		bool requireHeavy = false)
 	{
 		BindPlayer();
 		if (AnimPlayer != null)
@@ -101,7 +146,19 @@ public partial class EnemyAnimDriver : Node
 			AnimPlayer.SpeedScale = 1f;
 		}
 
-		PlayKind(AnimKind.Attack, AttackClip, 0.08f, forceRestart: true);
+		PickAttackVariant(
+			allowHeavy,
+			preferHeavy,
+			preferChance,
+			requireHeavy,
+			out string clip,
+			out AttackVariant variant,
+			out float hitStart,
+			out float hitEnd);
+		_attackVariant = variant;
+		_hitStart = hitStart;
+		_hitEnd = hitEnd;
+		PlayKind(AnimKind.Attack, clip, 0.08f, forceRestart: true);
 	}
 
 	public void PlayStagger()
@@ -121,10 +178,10 @@ public partial class EnemyAnimDriver : Node
 		_deathPoseHeld = false;
 		if (AnimPlayer != null)
 		{
-			AnimPlayer.SpeedScale = 1f;
+			AnimPlayer.SpeedScale = DeathSpeedScale;
 		}
 
-		PlayKind(AnimKind.Death, DeathClip, 0.05f, forceRestart: true);
+		PlayKind(AnimKind.Death, DeathClip, 0.04f, forceRestart: true);
 	}
 
 	/// <summary>
@@ -183,7 +240,7 @@ public partial class EnemyAnimDriver : Node
 		}
 
 		float t = GetCurrentPosition() / len;
-		return t >= AttackHitNormStart && t <= AttackHitNormEnd;
+		return t >= _hitStart && t <= _hitEnd;
 	}
 
 	public bool IsAttackFinished()
@@ -200,6 +257,100 @@ public partial class EnemyAnimDriver : Node
 
 		float len = GetCurrentLength();
 		return len > 0.01f && GetCurrentPosition() >= len - 0.02f;
+	}
+
+	private void PickAttackVariant(
+		bool allowHeavy,
+		bool preferHeavy,
+		float preferChance,
+		bool requireHeavy,
+		out string clip,
+		out AttackVariant variant,
+		out float hitStart,
+		out float hitEnd)
+	{
+		var options = new List<(string Clip, AttackVariant Variant, float Start, float End)>(3);
+		TryAddAttackOption(options, AttackClip, AttackVariant.Normal, AttackHitNormStart, AttackHitNormEnd);
+		TryAddAttackOption(options, AttackAltClip, AttackVariant.Alt, AttackAltHitNormStart, AttackAltHitNormEnd);
+		if (allowHeavy || requireHeavy)
+		{
+			TryAddAttackOption(
+				options,
+				AttackHeavyClip,
+				AttackVariant.Heavy,
+				AttackHeavyHitNormStart,
+				AttackHeavyHitNormEnd);
+		}
+
+		if (requireHeavy)
+		{
+			for (int h = 0; h < options.Count; h++)
+			{
+				if (options[h].Variant == AttackVariant.Heavy)
+				{
+					(clip, variant, hitStart, hitEnd) = options[h];
+					return;
+				}
+			}
+
+			// Нет heavy — оставляем Normal как маркер неудачи (caller откатит в chase).
+			clip = AttackClip;
+			variant = AttackVariant.Normal;
+			hitStart = AttackHitNormStart;
+			hitEnd = AttackHitNormEnd;
+			return;
+		}
+
+		if (options.Count == 0)
+		{
+			clip = AttackClip;
+			variant = AttackVariant.Normal;
+			hitStart = AttackHitNormStart;
+			hitEnd = AttackHitNormEnd;
+			return;
+		}
+
+		if (preferHeavy && preferChance > 0f)
+		{
+			int heavyIdx = -1;
+			for (int h = 0; h < options.Count; h++)
+			{
+				if (options[h].Variant == AttackVariant.Heavy)
+				{
+					heavyIdx = h;
+					break;
+				}
+			}
+
+			if (heavyIdx >= 0 && GD.Randf() <= preferChance)
+			{
+				(clip, variant, hitStart, hitEnd) = options[heavyIdx];
+				return;
+			}
+		}
+
+		int i = (int)(GD.Randi() % (uint)options.Count);
+		(clip, variant, hitStart, hitEnd) = options[i];
+	}
+
+	private void TryAddAttackOption(
+		List<(string Clip, AttackVariant Variant, float Start, float End)> options,
+		string clip,
+		AttackVariant variant,
+		float hitStart,
+		float hitEnd)
+	{
+		if (string.IsNullOrWhiteSpace(clip))
+		{
+			return;
+		}
+
+		if (ResolveClip(clip) == null)
+		{
+			return;
+		}
+
+		options.Add((clip, variant, hitStart, hitEnd));
 	}
 
 	private void OnAnimationFinished(StringName animName)
@@ -244,6 +395,11 @@ public partial class EnemyAnimDriver : Node
 
 	private void ConfigureLoop(string clip, bool loop)
 	{
+		if (string.IsNullOrWhiteSpace(clip))
+		{
+			return;
+		}
+
 		string? resolved = ResolveClip(clip);
 		if (resolved == null || AnimPlayer == null)
 		{
