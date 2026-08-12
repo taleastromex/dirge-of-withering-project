@@ -19,6 +19,14 @@ public partial class Hitbox3D : Area3D
 	[Export]
 	public float FilthPerDamage { get; set; }
 
+	/// <summary>Доля PhysicalResist цели, которую удар игнорирует (0…1).</summary>
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float PhysicalResistIgnore { get; set; }
+
+	/// <summary>Доля нанесённого урона, возвращаемая владельцу как heal (0.2 для Undead).</summary>
+	[Export(PropertyHint.Range, "0,1,0.01")]
+	public float LifestealFraction { get; set; }
+
 	[Export]
 	public float KnockbackForce { get; set; } = 8f;
 
@@ -97,6 +105,11 @@ public partial class Hitbox3D : Area3D
 			return;
 		}
 
+		if (OwnerRoot != null && !FactionRules.CanHarm(OwnerRoot, body))
+		{
+			return;
+		}
+
 		Health? health = FindHealth(body);
 		if (health == null || health.IsDead)
 		{
@@ -110,12 +123,13 @@ public partial class Hitbox3D : Area3D
 		}
 
 		Vector3 source = OwnerRoot is Node3D owner3D ? owner3D.GlobalPosition : GlobalPosition;
-		int applied = health.TakeDamage(Damage, source);
+		int applied = health.TakeDamage(Damage, source, PhysicalResistIgnore);
 		if (applied <= 0)
 		{
 			return;
 		}
 
+		ApplyLifesteal(applied);
 		ApplyFilthGain(body, applied);
 		ApplyKnockback(body, source);
 
@@ -132,6 +146,23 @@ public partial class Hitbox3D : Area3D
 		{
 			CombatHitStop.Pulse(GetTree(), HitStopSeconds);
 		}
+	}
+
+	private void ApplyLifesteal(int appliedDamage)
+	{
+		if (LifestealFraction <= 0f || appliedDamage <= 0 || OwnerRoot == null)
+		{
+			return;
+		}
+
+		Health? ownerHealth = FindHealth(OwnerRoot);
+		if (ownerHealth == null || ownerHealth.IsDead)
+		{
+			return;
+		}
+
+		int heal = Mathf.Max(1, Mathf.RoundToInt(appliedDamage * LifestealFraction));
+		ownerHealth.Heal(heal);
 	}
 
 	private void ApplyFilthGain(Node3D body, int appliedDamage)

@@ -26,30 +26,36 @@ public partial class PlayerWeaponAttach : Node
 	public float TargetLengthMeters { get; set; } = 1.55f;
 
 	[Export]
-	public Vector3 GripLocalPosition { get; set; } = new(0.0f, 0.06f, -0.03f);
+	public Vector3 GripLocalPosition { get; set; } = new(-0.01f, 0.1f, -0.01f);
 
 	/// <summary>
 	/// Bone-local euler (Godot YXZ). Idle / locomotion pose (~45° tip-up).
 	/// </summary>
 	[Export]
-	public Vector3 GripLocalRotationDegrees { get; set; } = new(225f, 0f, -90f);
+	public Vector3 GripLocalRotationDegrees { get; set; } = new(-120f, 90f, -75f);
 
 	/// <summary>
 	/// Pose during the attack hit window — flatter / more extended cut.
 	/// </summary>
 	[Export]
-	public Vector3 StrikeGripLocalRotationDegrees { get; set; } = new(160f, 0f, -90f);
+	public Vector3 StrikeGripLocalRotationDegrees { get; set; } = new(-120f, 90f, -75f);
+
+	/// <summary>
+	/// Roll mesh children around the handle (blade edge). Same role as enemy MeshPreRotation.
+	/// </summary>
+	[Export]
+	public Vector3 MeshPreRotationDegrees { get; set; } = new(15f, 0f, 0f);
 
 	/// <summary>
 	/// Slide along the blade axis (mesh +X). Positive pulls the handle into the palms
 	/// when the pommel sits ahead of the hands.
 	/// </summary>
 	[Export]
-	public float BladeSlideMeters { get; set; } = 0.32f;
+	public float BladeSlideMeters { get; set; } = 0.33f;
 
 	/// <summary>Slightly less slide on strike = tip reaches farther into the cut.</summary>
 	[Export]
-	public float StrikeBladeSlideMeters { get; set; } = 0.22f;
+	public float StrikeBladeSlideMeters { get; set; } = 0.23f;
 
 	[Export(PropertyHint.Range, "0.02,0.4,0.01")]
 	public float StrikeBlendInNorm { get; set; } = 0.1f;
@@ -60,6 +66,15 @@ public partial class PlayerWeaponAttach : Node
 	[Export]
 	public PlayerAnimDriver? AnimDriver { get; set; }
 
+	/// <summary>
+	/// Freezes player + T-pose; on-screen buttons + keys nudge grip. Print to Output.
+	/// </summary>
+	[Export]
+	public bool GripTuneMode { get; set; }
+
+	[Export]
+	public float GripTuneStepDegrees { get; set; } = 15f;
+
 	private Skeleton3D? _skeleton;
 	private int _boneIdx = -1;
 	private Node3D? _weapon;
@@ -68,26 +83,291 @@ public partial class PlayerWeaponAttach : Node
 	private Vector3 _gripOrigin;
 	private Quaternion _idleGripQuat = Quaternion.Identity;
 	private Quaternion _strikeGripQuat = Quaternion.Identity;
+	private Label? _gripTuneHud;
+	private CanvasLayer? _gripTuneLayer;
+	private string _lastInputDebug = "click buttons below (keys optional)";
 
 	public override void _Ready()
 	{
 		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
+		SetProcess(true);
+		SetProcessInput(true);
 		CallDeferred(nameof(AttachWeapon));
+		if (GripTuneMode)
+		{
+			CallDeferred(nameof(BeginGripTuneMode));
+		}
+	}
+
+	public override void _Input(InputEvent @event)
+	{
+		if (!GripTuneMode)
+		{
+			return;
+		}
+
+		if (@event is InputEventKey key && key.Pressed && !key.Echo)
+		{
+			Key phys = key.PhysicalKeycode != Key.None ? key.PhysicalKeycode : key.Keycode;
+			_lastInputDebug = $"KEY phys={phys} code={key.Keycode}";
+			NudgeFromKey(phys, key.ShiftPressed);
+			GetViewport().SetInputAsHandled();
+			return;
+		}
+
+		if (@event is InputEventMouseButton mouse && mouse.Pressed)
+		{
+			float step = mouse.ShiftPressed ? GripTuneStepDegrees * 0.2f : GripTuneStepDegrees;
+			if (mouse.ButtonIndex == MouseButton.WheelUp)
+			{
+				_lastInputDebug = "WHEEL+";
+				NudgeGrip(new Vector3(step, 0f, 0f));
+				GetViewport().SetInputAsHandled();
+			}
+			else if (mouse.ButtonIndex == MouseButton.WheelDown)
+			{
+				_lastInputDebug = "WHEEL-";
+				NudgeGrip(new Vector3(-step, 0f, 0f));
+				GetViewport().SetInputAsHandled();
+			}
+		}
+	}
+
+	private void NudgeFromKey(Key code, bool shift)
+	{
+		float step = GripTuneStepDegrees * (shift ? 0.2f : 1f);
+		float posStep = 0.01f * (shift ? 0.25f : 1f);
+
+		switch (code)
+		{
+			case Key.Q: NudgePre(-step); break;
+			case Key.E: NudgePre(step); break;
+			case Key.R:
+			case Key.Left: NudgeGrip(new Vector3(-step, 0f, 0f)); break;
+			case Key.F:
+			case Key.Right: NudgeGrip(new Vector3(step, 0f, 0f)); break;
+			case Key.T:
+			case Key.Up: NudgeGrip(new Vector3(0f, -step, 0f)); break;
+			case Key.G:
+			case Key.Down: NudgeGrip(new Vector3(0f, step, 0f)); break;
+			case Key.Y:
+			case Key.Pageup: NudgeGrip(new Vector3(0f, 0f, -step)); break;
+			case Key.H:
+			case Key.Pagedown: NudgeGrip(new Vector3(0f, 0f, step)); break;
+			case Key.U: NudgePos(new Vector3(-posStep, 0f, 0f)); break;
+			case Key.I: NudgePos(new Vector3(posStep, 0f, 0f)); break;
+			case Key.J: NudgePos(new Vector3(0f, -posStep, 0f)); break;
+			case Key.K: NudgePos(new Vector3(0f, posStep, 0f)); break;
+			case Key.N: NudgePos(new Vector3(0f, 0f, -posStep)); break;
+			case Key.M: NudgePos(new Vector3(0f, 0f, posStep)); break;
+			case Key.Comma: NudgeSlide(-posStep); break;
+			case Key.Period: NudgeSlide(posStep); break;
+			case Key.P: CommitGripTune(printOnly: true); break;
+			default:
+				UpdateGripTuneHud();
+				break;
+		}
+	}
+
+	private void NudgePre(float dx)
+	{
+		Vector3 pre = MeshPreRotationDegrees;
+		pre.X += dx;
+		MeshPreRotationDegrees = pre;
+		CommitGripTune();
+	}
+
+	private void NudgeGrip(Vector3 d)
+	{
+		GripLocalRotationDegrees += d;
+		CommitGripTune();
+	}
+
+	private void NudgePos(Vector3 d)
+	{
+		GripLocalPosition += d;
+		CommitGripTune();
+	}
+
+	private void NudgeSlide(float d)
+	{
+		BladeSlideMeters += d;
+		CommitGripTune();
+	}
+
+	private void CommitGripTune(bool printOnly = false)
+	{
+		if (!printOnly)
+		{
+			Vector3 pre = MeshPreRotationDegrees;
+			Vector3 grip = GripLocalRotationDegrees;
+			pre.X = WrapDegrees(pre.X);
+			grip.X = WrapDegrees(grip.X);
+			grip.Y = WrapDegrees(grip.Y);
+			grip.Z = WrapDegrees(grip.Z);
+			MeshPreRotationDegrees = pre;
+			GripLocalRotationDegrees = grip;
+			StrikeGripLocalRotationDegrees = grip;
+			StrikeBladeSlideMeters = BladeSlideMeters;
+		}
+
+		RebuildGripQuats();
+		ApplyMeshPreRotationToChildren();
+		ApplyGripPose(0f);
+		UpdateGripTuneHud();
+
+		Vector3 g = GripLocalRotationDegrees;
+		Vector3 p = GripLocalPosition;
+		GD.Print(
+			"[GripTune] " +
+			$"preX={MeshPreRotationDegrees.X:0.#}  gripRot=({g.X:0.#}, {g.Y:0.#}, {g.Z:0.#})  " +
+			$"pos=({p.X:0.###}, {p.Y:0.###}, {p.Z:0.###})  slide={BladeSlideMeters:0.###}  " +
+			$"weapon={(_weapon != null ? "OK" : "NULL")}");
+	}
+
+	private void RebuildGripQuats()
+	{
+		_idleGripQuat = Quaternion.FromEuler(GripLocalRotationDegrees * (Mathf.Pi / 180f));
+		_strikeGripQuat = Quaternion.FromEuler(StrikeGripLocalRotationDegrees * (Mathf.Pi / 180f));
+	}
+
+	private static float WrapDegrees(float deg)
+	{
+		deg %= 360f;
+		if (deg > 180f)
+		{
+			deg -= 360f;
+		}
+
+		if (deg < -180f)
+		{
+			deg += 360f;
+		}
+
+		return deg;
+	}
+
+	private void BeginGripTuneMode()
+	{
+		if (GetParent() is Player player)
+		{
+			player.ControlEnabled = false;
+		}
+
+		if (GetParent()?.GetNodeOrNull<PlayerAttack>("PlayerAttack") is PlayerAttack attack)
+		{
+			attack.AttackEnabled = false;
+		}
+
+		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
+		if (AnimDriver != null)
+		{
+			AnimDriver.HoldRestPose = true;
+			AnimDriver.ForceRestPose();
+		}
+
+		EnsureGripTuneHud();
+		UpdateGripTuneHud();
+		GD.Print(
+			"[GripTune] Player T-pose. Use ON-SCREEN BUTTONS (keyboard often blocked by editor focus).\n" +
+			$"  weapon={(_weapon != null ? _weapon.Name : "NULL")} bone={_boneIdx}");
+	}
+
+	private void EnsureGripTuneHud()
+	{
+		if (_gripTuneLayer != null && GodotObject.IsInstanceValid(_gripTuneLayer))
+		{
+			return;
+		}
+
+		_gripTuneLayer = new CanvasLayer { Name = "GripTuneHud", Layer = 100 };
+		var root = new VBoxContainer
+		{
+			Position = new Vector2(12, 12),
+			CustomMinimumSize = new Vector2(420, 0),
+		};
+
+		_gripTuneHud = new Label { Name = "GripTuneLabel", Text = "GRIPTUNE ON" };
+		_gripTuneHud.AddThemeColorOverride("font_color", new Color(1f, 0.85f, 0.2f));
+		_gripTuneHud.AddThemeFontSizeOverride("font_size", 18);
+		root.AddChild(_gripTuneHud);
+
+		root.AddChild(MakeTuneRow("preX", () => NudgePre(-GripTuneStepDegrees), () => NudgePre(GripTuneStepDegrees)));
+		root.AddChild(MakeTuneRow("gripX", () => NudgeGrip(new Vector3(-GripTuneStepDegrees, 0f, 0f)), () => NudgeGrip(new Vector3(GripTuneStepDegrees, 0f, 0f))));
+		root.AddChild(MakeTuneRow("gripY", () => NudgeGrip(new Vector3(0f, -GripTuneStepDegrees, 0f)), () => NudgeGrip(new Vector3(0f, GripTuneStepDegrees, 0f))));
+		root.AddChild(MakeTuneRow("gripZ", () => NudgeGrip(new Vector3(0f, 0f, -GripTuneStepDegrees)), () => NudgeGrip(new Vector3(0f, 0f, GripTuneStepDegrees))));
+		root.AddChild(MakeTuneRow("posX", () => NudgePos(new Vector3(-0.01f, 0f, 0f)), () => NudgePos(new Vector3(0.01f, 0f, 0f))));
+		root.AddChild(MakeTuneRow("posY", () => NudgePos(new Vector3(0f, -0.01f, 0f)), () => NudgePos(new Vector3(0f, 0.01f, 0f))));
+		root.AddChild(MakeTuneRow("posZ", () => NudgePos(new Vector3(0f, 0f, -0.01f)), () => NudgePos(new Vector3(0f, 0f, 0.01f))));
+		root.AddChild(MakeTuneRow("slide", () => NudgeSlide(-0.01f), () => NudgeSlide(0.01f)));
+
+		var printBtn = new Button { Text = "PRINT [GripTune] line" };
+		printBtn.Pressed += () => CommitGripTune(printOnly: true);
+		root.AddChild(printBtn);
+
+		_gripTuneLayer.AddChild(root);
+		GetTree()?.Root.AddChild(_gripTuneLayer);
+	}
+
+	private static HBoxContainer MakeTuneRow(string label, System.Action onMinus, System.Action onPlus)
+	{
+		var row = new HBoxContainer();
+		var name = new Label { Text = label, CustomMinimumSize = new Vector2(70, 0) };
+		var minus = new Button { Text = "−", CustomMinimumSize = new Vector2(44, 32) };
+		var plus = new Button { Text = "+", CustomMinimumSize = new Vector2(44, 32) };
+		minus.Pressed += onMinus;
+		plus.Pressed += onPlus;
+		row.AddChild(name);
+		row.AddChild(minus);
+		row.AddChild(plus);
+		return row;
+	}
+
+	private void UpdateGripTuneHud()
+	{
+		if (_gripTuneHud == null || !GodotObject.IsInstanceValid(_gripTuneHud))
+		{
+			return;
+		}
+
+		Vector3 g = GripLocalRotationDegrees;
+		Vector3 p = GripLocalPosition;
+		bool focused = GetWindow()?.HasFocus() ?? false;
+		string weapon = _weapon != null ? "OK" : "NULL";
+		_gripTuneHud.AddThemeColorOverride(
+			"font_color",
+			weapon == "OK" ? new Color(1f, 0.85f, 0.2f) : new Color(1f, 0.25f, 0.2f));
+		_gripTuneHud.Text =
+			$"GRIPTUNE  weapon={weapon}  focus={(focused ? "YES" : "NO")}\n" +
+			$"preX={MeshPreRotationDegrees.X:0.#}  grip=({g.X:0.#},{g.Y:0.#},{g.Z:0.#})\n" +
+			$"pos=({p.X:0.###},{p.Y:0.###},{p.Z:0.###})  slide={BladeSlideMeters:0.###}\n" +
+			$"last: {_lastInputDebug}";
 	}
 
 	public override void _Process(double delta)
 	{
+		if (GripTuneMode)
+		{
+			AnimDriver?.ForceRestPose();
+			UpdateGripTuneHud();
+		}
+
 		if (_skeleton == null || _weapon == null || _boneIdx < 0)
 		{
 			return;
 		}
 
-		float strike = AnimDriver?.GetWeaponStrikeWeight(StrikeBlendInNorm, StrikeBlendOutNorm) ?? 0f;
+		float strike = GripTuneMode
+			? 0f
+			: AnimDriver?.GetWeaponStrikeWeight(StrikeBlendInNorm, StrikeBlendOutNorm) ?? 0f;
+
+		if (GripTuneMode)
+		{
+			RebuildGripQuats();
+		}
+
 		ApplyGripPose(strike);
 
-		// Bone pose is relative to skeleton; compose to world so anims drive the sword.
-		// IMPORTANT: bake fit-scale into this transform — assigning GlobalTransform would
-		// otherwise wipe Node3D.Scale and revive Sketchfab's x100 hierarchy scale.
 		Transform3D boneWorld = _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_boneIdx);
 		Basis worldBasis = boneWorld.Basis * _gripBasis;
 		worldBasis = worldBasis.Scaled(Vector3.One * _fitScale);
@@ -102,6 +382,23 @@ public partial class PlayerWeaponAttach : Node
 		float slide = Mathf.Lerp(BladeSlideMeters, StrikeBladeSlideMeters, w);
 		Vector3 alongBlade = _gripBasis * Vector3.Right;
 		_gripOrigin = GripLocalPosition - alongBlade * slide;
+	}
+
+	private void ApplyMeshPreRotationToChildren()
+	{
+		if (_weapon == null)
+		{
+			return;
+		}
+
+		Basis align = Basis.FromEuler(MeshPreRotationDegrees * (Mathf.Pi / 180f));
+		foreach (Node child in _weapon.GetChildren())
+		{
+			if (child is MeshInstance3D mi)
+			{
+				mi.Transform = new Transform3D(align, mi.Position);
+			}
+		}
 	}
 
 	private void AttachWeapon()
@@ -147,19 +444,21 @@ public partial class PlayerWeaponAttach : Node
 		(visual ?? GetParent())?.AddChild(_weapon);
 		_weapon.Name = "Zweihander";
 
-		_idleGripQuat = Quaternion.FromEuler(GripLocalRotationDegrees * (Mathf.Pi / 180f));
-		_strikeGripQuat = Quaternion.FromEuler(StrikeGripLocalRotationDegrees * (Mathf.Pi / 180f));
+		RebuildGripQuats();
 		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
+		ApplyMeshPreRotationToChildren();
 		ApplyGripPose(0f);
 
 		GD.Print(
-			$"PlayerWeaponAttach: bound to '{_skeleton.GetBoneName(_boneIdx)}', fitScale={_fitScale:0.####}, bladeSlide={BladeSlideMeters:0.##}.");
+			$"PlayerWeaponAttach: bound to '{_skeleton.GetBoneName(_boneIdx)}', fitScale={_fitScale:0.####}, bladeSlide={BladeSlideMeters:0.##}, GripTune={GripTuneMode}.");
+
+		if (GripTuneMode)
+		{
+			EnsureGripTuneHud();
+			UpdateGripTuneHud();
+		}
 	}
 
-	/// <summary>
-	/// Instantiates the prop and re-parents only MeshInstance3Ds under a clean root,
-	/// stripping Sketchfab scale=100 nodes that otherwise make a ~100m sword.
-	/// </summary>
 	private Node3D? BuildNormalizedWeapon()
 	{
 		Node3D? source = InstantiateWeapon();
@@ -173,7 +472,6 @@ public partial class PlayerWeaponAttach : Node
 		CollectMeshes(source, meshes);
 		if (meshes.Count == 0)
 		{
-			// Fallback: keep hierarchy, compensate scale empirically.
 			_fitScale = 0.0022f;
 			holder.AddChild(source);
 			return holder;
@@ -217,13 +515,10 @@ public partial class PlayerWeaponAttach : Node
 			float longest = Mathf.Max(bb.Size.X, Mathf.Max(bb.Size.Y, bb.Size.Z));
 			_fitScale = longest > 0.001f ? TargetLengthMeters / longest : 0.25f;
 
-			// Shift so the grip sits near the bone: use the AABB end closest to origin
-			// along the longest axis as a rough pommel/guard anchor.
 			Vector3 center = bb.GetCenter();
 			Vector3 gripShift = -center;
 			if (bb.Size.X >= bb.Size.Y && bb.Size.X >= bb.Size.Z)
 			{
-				// Blade along X — pull so min-X (or nearer end to 0) is at grip.
 				float pommelX = Mathf.Abs(bb.Position.X) <= Mathf.Abs(bb.End.X) ? bb.Position.X : bb.End.X;
 				gripShift = new Vector3(-pommelX, -center.Y, -center.Z);
 			}

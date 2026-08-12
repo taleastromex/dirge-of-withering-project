@@ -11,6 +11,14 @@
 - Textures downscaled to **1024** for the Vertical Slice
 
 ## Processed clips (logical names)
-`idle`, `walk`, `run`, `attack`, `stagger`, `death`
+`idle`, `walk`, `run`, `attack`, `stagger`, `death`, `death_alt`, `death_flyback`
 
-Rebuild (если снова понадобится): скачать FBX с Mixamo и прогнать `Tools/merge_mixamo_anims.py --preset mutant|zombie`.
+Shared Mixamo deaths (`Dying` / `Falling Back Death` / `Flying Back Death`) append via:
+```bash
+blender --factory-startup --background --python Tools/merge_mixamo_anims.py -- \
+  --base "Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall.glb" \
+  --anims-dir "Assets/ThirdParty/CathedralSlice/Source/HumanHostiles/Bandit" \
+  --out "Assets/ThirdParty/BlightedWretch/Processed/ZombieThrall.glb" \
+  --preset mixamo_deaths --append --strip-root-motion
+```
+(same for `MutantBrute.glb`). Runtime: any `BasicEnemy` with those clip names gets random death / explosive flyback.

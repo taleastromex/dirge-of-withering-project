@@ -57,6 +57,10 @@ public partial class PlayerAnimDriver : Node
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float HeavyAttackHitNormEnd { get; set; } = 0.78f;
 
+	/// <summary>Stop clips and hold bind / T-pose (weapon grip tuning).</summary>
+	[Export]
+	public bool HoldRestPose { get; set; }
+
 	private AnimKind _kind = AnimKind.None;
 	private string _current = "";
 	private bool _bound;
@@ -163,6 +167,12 @@ public partial class PlayerAnimDriver : Node
 
 	public void UpdateLocomotion(float horizontalSpeed)
 	{
+		if (HoldRestPose)
+		{
+			ForceRestPose();
+			return;
+		}
+
 		if (_kind is AnimKind.Attack or AnimKind.Hurt or AnimKind.Death)
 		{
 			return;
@@ -197,8 +207,37 @@ public partial class PlayerAnimDriver : Node
 
 	public void PlayRun() => PlayKind(AnimKind.Run, RunClip, 0.15f, forceRestart: false);
 
+	/// <summary>Stop clips and reset skeleton to bind / T-pose (weapon grip tuning).</summary>
+	public void ForceRestPose()
+	{
+		BindPlayer();
+		if (AnimPlayer != null)
+		{
+			AnimPlayer.Stop();
+			AnimPlayer.SpeedScale = 1f;
+		}
+
+		_kind = AnimKind.None;
+		_current = "";
+		_deathPoseHeld = false;
+		_heavyAttack = false;
+
+		Skeleton3D? skeleton = FindSkeleton(GetParent() ?? this);
+		if (skeleton == null)
+		{
+			return;
+		}
+
+		skeleton.ResetBonePoses();
+	}
+
 	public void PlayAttack(bool heavy)
 	{
+		if (HoldRestPose)
+		{
+			return;
+		}
+
 		if (_kind == AnimKind.Death || _kind == AnimKind.Hurt)
 		{
 			return;
@@ -437,6 +476,25 @@ public partial class PlayerAnimDriver : Node
 		foreach (Node child in root.GetChildren())
 		{
 			AnimationPlayer? found = FindAnimationPlayer(child);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
+	}
+
+	private static Skeleton3D? FindSkeleton(Node root)
+	{
+		if (root is Skeleton3D sk)
+		{
+			return sk;
+		}
+
+		foreach (Node child in root.GetChildren())
+		{
+			Skeleton3D? found = FindSkeleton(child);
 			if (found != null)
 			{
 				return found;

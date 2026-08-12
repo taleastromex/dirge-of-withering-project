@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="WeaponEquipData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Combat/WeaponEquipData.cs" id="1_equip"]
+
+[resource]
+script = ExtResource("1_equip")
+DisplayName = "Bandit Axe"
+Slot = 1
+BoneName = "mixamorig:RightHand"
+WeaponPath = "res://Assets/ThirdParty/Weapons/one-handed-axe/Processed/BanditAxe.glb"
+WeaponNodeName = "BanditAxe"
+SocketAuthored = false
+LocalPosition = Vector3(-0.01, 0.14, 0.01)
+LocalRotationDegrees = Vector3(240, 90, 270)
+StrikeLocalRotationDegrees = Vector3(240, 90, 270)
+BladeSlideMeters = 0.28
+StrikeBladeSlideMeters = 0.2
+MeshPreRotationDegrees = Vector3(180, 0, 0)
+AlignLongestAxisToX = false
+RecenterGripToPommel = false
+TargetLengthMeters = 0.85

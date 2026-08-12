@@ -51,16 +51,18 @@ public partial class Health : Node
 
 	/// <summary>
 	/// Наносит урон с учётом PhysicalResist.
+	/// <paramref name="physicalResistIgnore"/> (0…1) снижает эффективный resist.
 	/// Возвращает фактически снятый HP (0 если удар проигнорирован).
 	/// </summary>
-	public int TakeDamage(int amount, Vector3 sourcePosition = default)
+	public int TakeDamage(int amount, Vector3 sourcePosition = default, float physicalResistIgnore = 0f)
 	{
 		if (IsDead || amount <= 0 || IsInvulnerable)
 		{
 			return 0;
 		}
 
-		float resist = Mathf.Clamp(PhysicalResist, 0f, 0.95f);
+		float ignore = Mathf.Clamp(physicalResistIgnore, 0f, 1f);
+		float resist = Mathf.Clamp(PhysicalResist * (1f - ignore), 0f, 0.95f);
 		int applied = Mathf.Max(1, Mathf.RoundToInt(amount * (1f - resist)));
 		ApplyHpLoss(applied, grantIframes: true, sourcePosition);
 		return applied;
@@ -101,6 +103,17 @@ public partial class Health : Node
 		{
 			EmitSignal(SignalName.Died);
 		}
+	}
+
+	public void Heal(int amount)
+	{
+		if (IsDead || amount <= 0)
+		{
+			return;
+		}
+
+		Current = Mathf.Min(MaxHealth, Current + amount);
+		EmitSignal(SignalName.HealthChanged, Current, MaxHealth);
 	}
 
 	public void HealFull()

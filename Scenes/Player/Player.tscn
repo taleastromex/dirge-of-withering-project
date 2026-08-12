@@ -96,14 +96,16 @@ ModelPath = NodePath("../Visual/Model")
 BoneName = "mixamorig:RightHand"
 WeaponPath = "res://Assets/ThirdParty/Weapons/zweihander.glb"
 TargetLengthMeters = 1.65
-GripLocalPosition = Vector3(0, 0.06, -0.03)
-GripLocalRotationDegrees = Vector3(225, 0, -90)
-StrikeGripLocalRotationDegrees = Vector3(160, 0, -90)
-BladeSlideMeters = 0.32
-StrikeBladeSlideMeters = 0.22
+GripLocalPosition = Vector3(-0.01, 0.1, -0.01)
+GripLocalRotationDegrees = Vector3(-120, 90, -75)
+StrikeGripLocalRotationDegrees = Vector3(-120, 90, -75)
+MeshPreRotationDegrees = Vector3(15, 0, 0)
+BladeSlideMeters = 0.33
+StrikeBladeSlideMeters = 0.23
 StrikeBlendInNorm = 0.1
 StrikeBlendOutNorm = 0.14
 AnimDriver = NodePath("../AnimDriver")
+GripTuneMode = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)

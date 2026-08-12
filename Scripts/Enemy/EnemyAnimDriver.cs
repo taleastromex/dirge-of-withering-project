@@ -38,10 +38,20 @@ public partial class EnemyAnimDriver : Node
 	[Export] public string AttackHeavyClip { get; set; } = "";
 	[Export] public string StaggerClip { get; set; } = "stagger";
 	[Export] public string DeathClip { get; set; } = "death";
+	/// <summary>Доп. обычная смерть (рандом с Death / DeathDying).</summary>
+	[Export] public string DeathAltClip { get; set; } = "";
+	/// <summary>Ещё одна обычная смерть (напр. Mixamo Dying), не затирает оригинальный death.</summary>
+	[Export] public string DeathDyingClip { get; set; } = "";
+	/// <summary>Экспрессивная смерть (flyback) — только по флагу explosive.</summary>
+	[Export] public string DeathExplosiveClip { get; set; } = "";
 
 	/// <summary>Ускорение death — меньше «стоят перед падением».</summary>
 	[Export(PropertyHint.Range, "1,3,0.05")]
 	public float DeathSpeedScale { get; set; } = 1.85f;
+
+	/// <summary>Темп attack / attack_alt / attack_heavy (Mixamo часто тянет).</summary>
+	[Export(PropertyHint.Range, "0.5,2.5,0.05")]
+	public float AttackSpeedScale { get; set; } = 1f;
 
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float AttackHitNormStart { get; set; } = 0.48f;
@@ -73,6 +83,40 @@ public partial class EnemyAnimDriver : Node
 
 	public AttackVariant CurrentAttackVariant => _attackVariant;
 
+	public bool IsDeathPoseHeld => _deathPoseHeld;
+
+	/// <summary>Death-клип доиграл или уже зафиксирован на последнем кадре.</summary>
+	public bool IsDeathReadyToSettle()
+	{
+		if (_kind != AnimKind.Death)
+		{
+			return true;
+		}
+
+		if (_deathPoseHeld)
+		{
+			return true;
+		}
+
+		return IsDeathFinished();
+	}
+
+	public bool IsDeathFinished()
+	{
+		if (_kind != AnimKind.Death || AnimPlayer == null)
+		{
+			return true;
+		}
+
+		if (!AnimPlayer.IsPlaying())
+		{
+			return true;
+		}
+
+		float len = GetCurrentLength();
+		return len > 0.01f && GetCurrentPosition() >= len - 0.02f;
+	}
+
 	public override void _Ready()
 	{
 		CallDeferred(MethodName.BindPlayer);
@@ -98,6 +142,9 @@ public partial class EnemyAnimDriver : Node
 		ConfigureLoop(AttackHeavyClip, loop: false);
 		ConfigureLoop(StaggerClip, loop: false);
 		ConfigureLoop(DeathClip, loop: false);
+		ConfigureLoop(DeathAltClip, loop: false);
+		ConfigureLoop(DeathDyingClip, loop: false);
+		ConfigureLoop(DeathExplosiveClip, loop: false);
 		AnimPlayer.SpeedScale = 1f;
 		AnimPlayer.AnimationFinished += OnAnimationFinished;
 		_bound = true;
@@ -143,7 +190,7 @@ public partial class EnemyAnimDriver : Node
 		BindPlayer();
 		if (AnimPlayer != null)
 		{
-			AnimPlayer.SpeedScale = 1f;
+			AnimPlayer.SpeedScale = AttackSpeedScale;
 		}
 
 		PickAttackVariant(
@@ -172,7 +219,10 @@ public partial class EnemyAnimDriver : Node
 		PlayKind(AnimKind.Stagger, StaggerClip, 0.05f, forceRestart: true);
 	}
 
-	public void PlayDeath()
+	/// <param name="explosive">
+	/// true — Flying Back / DeathExplosiveClip, если есть; иначе обычный рандом death/death_alt.
+	/// </param>
+	public void PlayDeath(bool explosive = false)
 	{
 		BindPlayer();
 		_deathPoseHeld = false;
@@ -181,7 +231,48 @@ public partial class EnemyAnimDriver : Node
 			AnimPlayer.SpeedScale = DeathSpeedScale;
 		}
 
-		PlayKind(AnimKind.Death, DeathClip, 0.04f, forceRestart: true);
+		string clip = PickDeathClip(explosive);
+		PlayKind(AnimKind.Death, clip, 0.04f, forceRestart: true);
+	}
+
+	private string PickDeathClip(bool explosive)
+	{
+		if (explosive)
+		{
+			string? explosiveResolved = ResolveClip(DeathExplosiveClip);
+			if (explosiveResolved != null)
+			{
+				return DeathExplosiveClip;
+			}
+		}
+
+		var options = new List<string>(3);
+		TryAddDeathOption(options, DeathClip);
+		TryAddDeathOption(options, DeathAltClip);
+		TryAddDeathOption(options, DeathDyingClip);
+
+		if (options.Count == 0)
+		{
+			return DeathClip;
+		}
+
+		int i = (int)(GD.Randi() % (uint)options.Count);
+		return options[i];
+	}
+
+	private void TryAddDeathOption(List<string> options, string clip)
+	{
+		if (string.IsNullOrWhiteSpace(clip))
+		{
+			return;
+		}
+
+		if (ResolveClip(clip) == null)
+		{
+			return;
+		}
+
+		options.Add(clip);
 	}
 
 	/// <summary>
@@ -206,6 +297,29 @@ public partial class EnemyAnimDriver : Node
 		}
 	}
 
+	/// <summary>Stop clips and reset skeleton to bind / T-pose (weapon grip tuning).</summary>
+	public void ForceRestPose()
+	{
+		BindPlayer();
+		if (AnimPlayer != null)
+		{
+			AnimPlayer.Stop();
+			AnimPlayer.SpeedScale = 1f;
+		}
+
+		_kind = AnimKind.None;
+		_current = "";
+		_deathPoseHeld = false;
+
+		Skeleton3D? skeleton = FindSkeleton(GetParent() ?? this);
+		if (skeleton == null)
+		{
+			return;
+		}
+
+		skeleton.ResetBonePoses();
+	}
+
 	public float GetCurrentLength()
 	{
 		if (AnimPlayer == null || string.IsNullOrEmpty(_current))
@@ -214,6 +328,19 @@ public partial class EnemyAnimDriver : Node
 		}
 
 		return (float)AnimPlayer.CurrentAnimationLength;
+	}
+
+	/// <summary>Длительность текущего клипа в секундах с учётом SpeedScale.</summary>
+	public float GetCurrentPlaybackSeconds()
+	{
+		float len = GetCurrentLength();
+		if (len <= 0.01f || AnimPlayer == null)
+		{
+			return 0f;
+		}
+
+		float speed = Mathf.Abs(AnimPlayer.SpeedScale);
+		return speed > 0.01f ? len / speed : len;
 	}
 
 	public float GetCurrentPosition()
@@ -241,6 +368,46 @@ public partial class EnemyAnimDriver : Node
 
 		float t = GetCurrentPosition() / len;
 		return t >= _hitStart && t <= _hitEnd;
+	}
+
+	/// <summary>
+	/// 0 = idle grip, 1 = strike grip. Ramps around the active hit window.
+	/// </summary>
+	public float GetWeaponStrikeWeight(float blendInNorm = 0.1f, float blendOutNorm = 0.14f)
+	{
+		if (_kind != AnimKind.Attack)
+		{
+			return 0f;
+		}
+
+		float len = GetCurrentLength();
+		if (len <= 0.01f)
+		{
+			return 0f;
+		}
+
+		float t = GetCurrentPosition() / len;
+		float rampIn = Mathf.Max(0f, _hitStart - Mathf.Max(0.01f, blendInNorm));
+		float rampOut = Mathf.Min(1f, _hitEnd + Mathf.Max(0.01f, blendOutNorm));
+
+		if (t <= rampIn || t >= rampOut)
+		{
+			return 0f;
+		}
+
+		if (t < _hitStart)
+		{
+			float u = Mathf.Clamp((t - rampIn) / Mathf.Max(0.0001f, _hitStart - rampIn), 0f, 1f);
+			return u * u * (3f - 2f * u);
+		}
+
+		if (t <= _hitEnd)
+		{
+			return 1f;
+		}
+
+		float v = Mathf.Clamp((t - _hitEnd) / Mathf.Max(0.0001f, rampOut - _hitEnd), 0f, 1f);
+		return 1f - (v * v * (3f - 2f * v));
 	}
 
 	public bool IsAttackFinished()
@@ -448,6 +615,25 @@ public partial class EnemyAnimDriver : Node
 		foreach (Node child in root.GetChildren())
 		{
 			AnimationPlayer? found = FindAnimationPlayer(child);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
+	}
+
+	private static Skeleton3D? FindSkeleton(Node root)
+	{
+		if (root is Skeleton3D sk)
+		{
+			return sk;
+		}
+
+		foreach (Node child in root.GetChildren())
+		{
+			Skeleton3D? found = FindSkeleton(child);
 			if (found != null)
 			{
 				return found;
