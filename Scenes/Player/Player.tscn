@@ -36,22 +36,22 @@ MoveSpeed = 4.0
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
-MaxHealth = 100
+MaxHealth = 180
+PhysicalResist = 0.2
 InvulnerabilityDuration = 0.5
 
 [node name="Blight" type="Node" parent="."]
 script = ExtResource("5_blight")
 MaxBlight = 100.0
-HighThreshold = 60.0
+HighThreshold = 50.0
 
 [node name="BlightController" type="Node" parent="." node_paths=PackedStringArray("Blight", "Health", "Player")]
 script = ExtResource("6_blight_ctrl")
 Blight = NodePath("../Blight")
 Health = NodePath("../Health")
 Player = NodePath("..")
-BlightPerDamageTaken = 0.55
-BlightPerHeavyAttack = 16.0
-OverloadDrainPerSecond = 14.0
+HeavyFilthSoftCap = 20.0
+OverloadDrainPerSecond = 6.0
 PassiveDecayPerSecond = 1.0
 DecayDelayAfterGain = 0.6
 
@@ -66,8 +66,8 @@ HeavyAttackFallbackDuration = 2.0
 RecoveryTime = 0.12
 HeavyRecoveryTime = 0.18
 HeavyTelegraphNormStart = 0.45
-Damage = 28
-HeavyDamage = 56
+Damage = 40
+IchorRatio = 0.5
 KnockbackForce = 9.0
 HitStopSeconds = 0.055
 
@@ -125,7 +125,7 @@ collision_mask = 4
 monitorable = false
 monitoring = false
 script = ExtResource("4_hitbox")
-Damage = 28
+Damage = 40
 KnockbackForce = 9.0
 HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")

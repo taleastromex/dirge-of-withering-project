@@ -4,7 +4,6 @@ namespace DirgeOfWithering;
 
 /// <summary>
 /// Общий компонент здоровья для игрока и врагов.
-/// TODO (этап 2): хуки под Скверну (урон от перегрузки, модификаторы).
 /// </summary>
 public partial class Health : Node
 {
@@ -19,6 +18,10 @@ public partial class Health : Node
 
 	[Export]
 	public int MaxHealth { get; set; } = 100;
+
+	/// <summary>Доля входящего физ. урона, которая отсекается (0…0.95).</summary>
+	[Export(PropertyHint.Range, "0,0.95,0.01")]
+	public float PhysicalResist { get; set; }
 
 	/// <summary>Неуязвимость после получения урона (i-frames).</summary>
 	[Export]
@@ -46,20 +49,25 @@ public partial class Health : Node
 		}
 	}
 
-	/// <summary>Наносит урон. Возвращает false, если удар проигнорирован.</summary>
-	public bool TakeDamage(int amount, Vector3 sourcePosition = default)
+	/// <summary>
+	/// Наносит урон с учётом PhysicalResist.
+	/// Возвращает фактически снятый HP (0 если удар проигнорирован).
+	/// </summary>
+	public int TakeDamage(int amount, Vector3 sourcePosition = default)
 	{
 		if (IsDead || amount <= 0 || IsInvulnerable)
 		{
-			return false;
+			return 0;
 		}
 
-		ApplyHpLoss(amount, grantIframes: true, sourcePosition);
-		return true;
+		float resist = Mathf.Clamp(PhysicalResist, 0f, 0.95f);
+		int applied = Mathf.Max(1, Mathf.RoundToInt(amount * (1f - resist)));
+		ApplyHpLoss(applied, grantIframes: true, sourcePosition);
+		return applied;
 	}
 
 	/// <summary>
-	/// Урон без i-frames (перегрузка Скверны и т.п.).
+	/// Урон без i-frames и без PhysicalResist (перегрузка Скверны и т.п.).
 	/// Не эмитит Damaged — чтобы не крутить набор Скверны от drain.
 	/// </summary>
 	public bool ApplyDrain(int amount)

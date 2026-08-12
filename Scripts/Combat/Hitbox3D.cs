@@ -12,6 +12,13 @@ public partial class Hitbox3D : Area3D
 	[Export]
 	public int Damage { get; set; } = 25;
 
+	/// <summary>
+	/// FILTH на цель за 1 ед. фактически снятого HP (0 = не заражает).
+	/// Искажённые Пеплом: 0.5.
+	/// </summary>
+	[Export]
+	public float FilthPerDamage { get; set; }
+
 	[Export]
 	public float KnockbackForce { get; set; } = 8f;
 
@@ -103,12 +110,13 @@ public partial class Hitbox3D : Area3D
 		}
 
 		Vector3 source = OwnerRoot is Node3D owner3D ? owner3D.GlobalPosition : GlobalPosition;
-		bool landed = health.TakeDamage(Damage, source);
-		if (!landed)
+		int applied = health.TakeDamage(Damage, source);
+		if (applied <= 0)
 		{
 			return;
 		}
 
+		ApplyFilthGain(body, applied);
 		ApplyKnockback(body, source);
 
 		// Weapon impact only when the player (or ally) lands a hit — player-hurt SFX is handled on Player.
@@ -124,6 +132,25 @@ public partial class Hitbox3D : Area3D
 		{
 			CombatHitStop.Pulse(GetTree(), HitStopSeconds);
 		}
+	}
+
+	private void ApplyFilthGain(Node3D body, int appliedDamage)
+	{
+		if (FilthPerDamage <= 0f || appliedDamage <= 0)
+		{
+			return;
+		}
+
+		float gain = appliedDamage * FilthPerDamage;
+		BlightController? ctrl = body.GetNodeOrNull<BlightController>("BlightController");
+		if (ctrl != null)
+		{
+			ctrl.NotifyFilthFromHit(gain);
+			return;
+		}
+
+		Blight? blight = body.GetNodeOrNull<Blight>("Blight");
+		blight?.Add(gain);
 	}
 
 	private void ApplyKnockback(Node3D body, Vector3 source)

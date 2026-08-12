@@ -45,17 +45,19 @@ public partial class PlayerAttack : Node
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float HeavyTelegraphNormStart { get; set; } = 0.45f;
 
+	/// <summary>База физ. урона light (N). Heavy = 2N.</summary>
 	[Export]
-	public int Damage { get; set; } = 28;
+	public int Damage { get; set; } = 40;
+
+	/// <summary>Доля ихор-урона от базы N (канон: 0.5).</summary>
+	[Export(PropertyHint.Range, "0,2,0.05")]
+	public float IchorRatio { get; set; } = 0.5f;
 
 	[Export]
 	public float KnockbackForce { get; set; } = 9f;
 
 	[Export]
 	public float HitStopSeconds { get; set; } = 0.055f;
-
-	[Export]
-	public int HeavyDamage { get; set; } = 56;
 
 	[Export]
 	public float HeavyKnockbackForce { get; set; } = 12f;
@@ -158,7 +160,7 @@ public partial class PlayerAttack : Node
 
 		if (heavy)
 		{
-			BlightController?.NotifyHeavyAttackUsed();
+			BlightController?.NotifyHeavyAttackUsed(Damage);
 			GameAudio.Instance?.PlaySfxOneShot(
 				SliceAudioIds.Pick(SliceAudioIds.SwingWhooshes),
 				volumeDbOffset: -1f);
@@ -258,6 +260,16 @@ public partial class PlayerAttack : Node
 		AnimDriver?.NotifyAttackFinished();
 	}
 
+	/// <summary>Итоговый урон в Hitbox: phys×filthMul + ichor (ichor без mul).</summary>
+	public int ComputeOutgoingDamage(bool heavy)
+	{
+		int n = heavy ? Damage * 2 : Damage;
+		float filthMul = BlightController?.GetDamageMultiplier() ?? 1f;
+		float phys = n * filthMul;
+		float ichor = IchorRatio * n;
+		return Mathf.Max(1, Mathf.RoundToInt(phys + ichor));
+	}
+
 	private void ApplyHitboxTuning(bool heavy)
 	{
 		if (Hitbox == null)
@@ -265,9 +277,7 @@ public partial class PlayerAttack : Node
 			return;
 		}
 
-		float blightMul = BlightController?.GetDamageMultiplier() ?? 1f;
-		int baseDamage = heavy ? HeavyDamage : Damage;
-		Hitbox.Damage = Mathf.RoundToInt(baseDamage * blightMul);
+		Hitbox.Damage = ComputeOutgoingDamage(heavy);
 		Hitbox.KnockbackForce = heavy ? HeavyKnockbackForce : KnockbackForce;
 		Hitbox.HitStopSeconds = heavy ? HeavyHitStopSeconds : HitStopSeconds;
 	}

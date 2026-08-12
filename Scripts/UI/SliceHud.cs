@@ -260,6 +260,8 @@ public partial class SliceHud : CanvasLayer
 
 		Color fill = FilthNormal;
 		string state = "";
+		float mul = _playerFilth.DamageMultiplier;
+		string mulText = mul > 1.001f ? $"  ×{mul:0.00}" : "";
 		if (_playerFilth.IsOverloaded)
 		{
 			float pulse = 0.55f + 0.45f * (0.5f + 0.5f * Mathf.Sin(_pulse));
@@ -281,7 +283,7 @@ public partial class SliceHud : CanvasLayer
 			_filthFill.BgColor = fill;
 		}
 
-		_filthLabel.Text = $"FILTH  {_playerFilth.Current:0}/{_playerFilth.MaxBlight:0}{state}";
+		_filthLabel.Text = $"FILTH  {_playerFilth.Current:0}/{_playerFilth.MaxBlight:0}{state}{mulText}";
 	}
 
 	private void UpdateHighMark()
@@ -298,7 +300,7 @@ public partial class SliceHud : CanvasLayer
 		}
 
 		float t = _playerFilth.MaxBlight <= 0f
-			? 0.6f
+			? 0.5f
 			: Mathf.Clamp(_playerFilth.HighThreshold / _playerFilth.MaxBlight, 0f, 1f);
 		_highMark.Position = new Vector2(width * t - 1f, 0f);
 		_highMark.Size = new Vector2(3f, Mathf.Max(16f, _filthTrack.Size.Y));

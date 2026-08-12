@@ -34,7 +34,7 @@ AttackRange = 2.05
 TelegraphTime = 0.32
 RecoveryTime = 0.42
 StaggerTime = 0.3
-AttackDamage = 30
+AttackDamage = 60
 AttackKnockback = 9.5
 DeathDespawnDelay = 3.0
 HighBlightSpeedMul = 1.35
@@ -45,7 +45,8 @@ AshTint = Color(0.88, 0.62, 0.58, 1)
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")
-MaxHealth = 112
+MaxHealth = 250
+PhysicalResist = 0.35
 InvulnerabilityDuration = 0.12
 
 [node name="AnimDriver" type="Node" parent="."]
@@ -80,7 +81,8 @@ collision_mask = 2
 monitorable = false
 monitoring = false
 script = ExtResource("3_hitbox")
-Damage = 30
+Damage = 60
+FilthPerDamage = 0.5
 KnockbackForce = 9.5
 HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")

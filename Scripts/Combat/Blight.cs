@@ -3,8 +3,8 @@ using Godot;
 namespace DirgeOfWithering;
 
 /// <summary>
-/// Шкала Скверны (0–100): риск/награда Vertical Slice 2.2.
-/// Высокая Скверна усиливает бой; 100% — перегрузка (drain HP снаружи).
+/// Шкала Скверны (0–100): риск/награда.
+/// Одна ступенчатая кривая урона/скорости (Concepts/DAMAGE.md, этап 3).
 /// </summary>
 public partial class Blight : Node
 {
@@ -20,21 +20,9 @@ public partial class Blight : Node
 	[Export]
 	public float MaxBlight { get; set; } = 100f;
 
-	/// <summary>С этого порога включаются боевые баффы.</summary>
+	/// <summary>Порог HIGH / первой ступени баффа (канон: 50%).</summary>
 	[Export]
-	public float HighThreshold { get; set; } = 60f;
-
-	[Export]
-	public float HighDamageBonus { get; set; } = 0.35f;
-
-	[Export]
-	public float HighSpeedBonus { get; set; } = 0.18f;
-
-	[Export]
-	public float OverloadDamageBonus { get; set; } = 0.25f;
-
-	[Export]
-	public float OverloadSpeedBonus { get; set; } = 0.12f;
+	public float HighThreshold { get; set; } = 50f;
 
 	public float Current { get; private set; }
 
@@ -44,43 +32,15 @@ public partial class Blight : Node
 
 	public float Normalized => MaxBlight <= 0f ? 0f : Mathf.Clamp(Current / MaxBlight, 0f, 1f);
 
-	public float DamageMultiplier
-	{
-		get
-		{
-			float m = 1f;
-			if (IsHigh)
-			{
-				m += HighDamageBonus;
-			}
+	/// <summary>Доля шкалы 0…1 для ступеней.</summary>
+	public float Percent => Normalized;
 
-			if (IsOverloaded)
-			{
-				m += OverloadDamageBonus;
-			}
+	/// <summary>Бонус к физ. урону (0…1), не включая базу.</summary>
+	public float FilthDamageBonus => ResolveDamageBonus(Percent);
 
-			return m;
-		}
-	}
+	public float DamageMultiplier => 1f + FilthDamageBonus;
 
-	public float SpeedMultiplier
-	{
-		get
-		{
-			float m = 1f;
-			if (IsHigh)
-			{
-				m += HighSpeedBonus;
-			}
-
-			if (IsOverloaded)
-			{
-				m += OverloadSpeedBonus;
-			}
-
-			return m;
-		}
-	}
+	public float SpeedMultiplier => 1f + ResolveSpeedBonus(Percent);
 
 	private bool _wasOverloaded;
 
@@ -130,5 +90,56 @@ public partial class Blight : Node
 			_wasOverloaded = false;
 			EmitSignal(SignalName.OverloadEnded);
 		}
+	}
+
+	/// <summary>
+	/// Ступени: &lt;50% → 0 | ≥50 → 0.25 | ≥75 → 0.50 | ≥90 → 0.75 | 100% → 1.0
+	/// </summary>
+	public static float ResolveDamageBonus(float percent01)
+	{
+		float p = Mathf.Clamp(percent01, 0f, 1f);
+		if (p >= 0.999f)
+		{
+			return 1f;
+		}
+
+		if (p >= 0.90f)
+		{
+			return 0.75f;
+		}
+
+		if (p >= 0.75f)
+		{
+			return 0.50f;
+		}
+
+		if (p >= 0.50f)
+		{
+			return 0.25f;
+		}
+
+		return 0f;
+	}
+
+	/// <summary>≥50 → +10% | ≥75 → +15% | 100% → +20%</summary>
+	public static float ResolveSpeedBonus(float percent01)
+	{
+		float p = Mathf.Clamp(percent01, 0f, 1f);
+		if (p >= 0.999f)
+		{
+			return 0.20f;
+		}
+
+		if (p >= 0.75f)
+		{
+			return 0.15f;
+		}
+
+		if (p >= 0.50f)
+		{
+			return 0.10f;
+		}
+
+		return 0f;
 	}
 }
