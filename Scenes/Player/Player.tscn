@@ -133,6 +133,7 @@ KnockbackForce = 9.0
 HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")
 DebugMesh = NodePath("DebugMesh")
+ShowDebugVisual = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
 shape = SubResource("BoxShape_hitbox")

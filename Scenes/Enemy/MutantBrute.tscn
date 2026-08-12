@@ -36,6 +36,11 @@ RecoveryTime = 0.42
 StaggerTime = 0.3
 AttackDamage = 60
 AttackKnockback = 9.5
+HeavyLungeDuration = 1.75
+HeavyLungeSpeed = 5.5
+HeavyLungeSpeedMinMul = 0.45
+HeavyLungeSpeedMaxMul = 1.2
+HeavyAttackPreferChance = 0.7
 DeathDespawnDelay = 3.0
 HighBlightSpeedMul = 1.35
 HighBlightTelegraphMul = 0.7
@@ -55,10 +60,16 @@ IdleClip = "idle"
 ChaseClip = "run"
 TelegraphClip = "stagger"
 AttackClip = "attack"
+AttackAltClip = "attack_alt"
+AttackHeavyClip = "attack_heavy"
 StaggerClip = "stagger"
 DeathClip = "death"
 AttackHitNormStart = 0.48
 AttackHitNormEnd = 0.62
+AttackAltHitNormStart = 0.40
+AttackAltHitNormEnd = 0.58
+AttackHeavyHitNormStart = 0.52
+AttackHeavyHitNormEnd = 0.62
 
 [node name="Nameplate" type="Node3D" parent="."]
 script = ExtResource("6_plate")
@@ -87,6 +98,7 @@ KnockbackForce = 9.5
 HitStopSeconds = 0.055
 OwnerRoot = NodePath("../..")
 DebugMesh = NodePath("DebugMesh")
+ShowDebugVisual = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Visual/Hitbox"]
 shape = SubResource("BoxShape_hitbox")
