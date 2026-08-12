@@ -94,6 +94,15 @@ public partial class BasicEnemy : CharacterBody3D
 	[Export]
 	public EnemyNameplate? Nameplate { get; set; }
 
+	[Export]
+	public float FootstepInterval { get; set; } = 0.48f;
+
+	[Export]
+	public float FootstepMinSpeed { get; set; } = 0.55f;
+
+	[Export]
+	public float SpatialSfxMaxDistance { get; set; } = 24f;
+
 	private AiState _state = AiState.Idle;
 	private float _stateTimer;
 	private Node3D? _player;
@@ -106,10 +115,11 @@ public partial class BasicEnemy : CharacterBody3D
 	private bool _deathSettling;
 	private float _deathGroundOffsetApplied;
 	private Skeleton3D? _deathSkeleton;
+	private float _footstepTimer;
 
 	/// <summary>Скорость опускания трупа к полу (м/с), если death без root motion по Y.</summary>
 	[Export]
-	public float DeathSettleSpeed { get; set; } = 4.5f;
+	public float DeathSettleSpeed { get; set; } = 7.5f;
 
 	/// <summary>Зазор кости/пола, при котором труп считаем приземлённым в этом кадре.</summary>
 	[Export]
@@ -213,6 +223,7 @@ public partial class BasicEnemy : CharacterBody3D
 				}
 
 				ChasePlayer(dt);
+				UpdateChaseFootsteps(dt);
 				break;
 
 			case AiState.Telegraph:
@@ -310,6 +321,13 @@ public partial class BasicEnemy : CharacterBody3D
 		FacePlayer(999f);
 		AnimDriver?.PlayTelegraph();
 		UpdateNameplateVisibility();
+		GameAudio.Instance?.PlaySfx3D(
+			this,
+			SliceAudioIds.Pick(SliceAudioIds.EnemyTelegraphGrowls),
+			volumeDbOffset: -4f,
+			pitchScale: 0.62f + GD.Randf() * 0.12f,
+			maxDistance: SpatialSfxMaxDistance,
+			unitSize: 5f);
 	}
 
 	private void BeginAttack()
@@ -404,6 +422,33 @@ public partial class BasicEnemy : CharacterBody3D
 		float speed = MoveSpeed * (PlayerHasHighBlight() ? HighBlightSpeedMul : 1f);
 		Velocity = new Vector3(dir.X * speed, Velocity.Y, dir.Z * speed);
 		FaceDirection(dir, dt);
+	}
+
+	private void UpdateChaseFootsteps(float dt)
+	{
+		Vector3 planar = new(Velocity.X, 0f, Velocity.Z);
+		float speed = planar.Length();
+		if (speed < FootstepMinSpeed)
+		{
+			_footstepTimer = 0f;
+			return;
+		}
+
+		float interval = FootstepInterval * Mathf.Clamp(MoveSpeed / Mathf.Max(speed, 0.01f), 0.6f, 1.35f);
+		_footstepTimer -= dt;
+		if (_footstepTimer > 0f)
+		{
+			return;
+		}
+
+		_footstepTimer = interval;
+		GameAudio.Instance?.PlaySfx3D(
+			this,
+			SliceAudioIds.Pick(SliceAudioIds.FootstepsConcrete),
+			volumeDbOffset: -8f,
+			pitchScale: 0.78f + GD.Randf() * 0.14f,
+			maxDistance: SpatialSfxMaxDistance * 0.85f,
+			unitSize: 3.5f);
 	}
 
 	private bool PlayerHasHighBlight()
@@ -584,10 +629,13 @@ public partial class BasicEnemy : CharacterBody3D
 			_deathSettling = false;
 		}
 
-		GameAudio.Instance?.PlaySfxOneShot(
+		GameAudio.Instance?.PlaySfx3D(
+			this,
 			SliceAudioIds.EnemyDeath,
-			volumeDbOffset: -3f,
-			pitchScale: 0.9f + GD.Randf() * 0.2f);
+			volumeDbOffset: -2f,
+			pitchScale: 0.85f + GD.Randf() * 0.2f,
+			maxDistance: SpatialSfxMaxDistance,
+			unitSize: 6f);
 
 		GetTree().CreateTimer(DeathDespawnDelay).Timeout += QueueFree;
 	}

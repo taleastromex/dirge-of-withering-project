@@ -28,6 +28,10 @@ public partial class EnemyAnimDriver : Node
 	[Export] public string StaggerClip { get; set; } = "stagger";
 	[Export] public string DeathClip { get; set; } = "death";
 
+	/// <summary>Ускорение death — меньше «стоят перед падением».</summary>
+	[Export(PropertyHint.Range, "1,3,0.05")]
+	public float DeathSpeedScale { get; set; } = 1.85f;
+
 	/// <summary>Доля длины attack-клипа, когда хитбокс активен (0..1).</summary>
 	[Export(PropertyHint.Range, "0,1,0.01")]
 	public float AttackHitNormStart { get; set; } = 0.48f;
@@ -121,10 +125,10 @@ public partial class EnemyAnimDriver : Node
 		_deathPoseHeld = false;
 		if (AnimPlayer != null)
 		{
-			AnimPlayer.SpeedScale = 1f;
+			AnimPlayer.SpeedScale = DeathSpeedScale;
 		}
 
-		PlayKind(AnimKind.Death, DeathClip, 0.05f, forceRestart: true);
+		PlayKind(AnimKind.Death, DeathClip, 0.04f, forceRestart: true);
 	}
 
 	/// <summary>

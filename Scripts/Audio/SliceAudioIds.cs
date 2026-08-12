@@ -47,6 +47,9 @@ public static class SliceAudioIds
 		"res://Assets/Audio/SFX/Footsteps/foley_footstep_concrete_3.wav",
 	};
 
+	/// <summary>Enemy telegraph / approach growls (pitched down effort grunts).</summary>
+	public static readonly string[] EnemyTelegraphGrowls = HeavyAttackVoices;
+
 	public static string Pick(string[] paths)
 	{
 		if (paths.Length == 0)

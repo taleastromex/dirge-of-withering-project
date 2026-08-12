@@ -79,7 +79,14 @@ public partial class PlayerAttack : Node
 
 	public bool IsAttacking => _phase is AttackPhase.Swing;
 
-	public bool LocksMovement => _phase is AttackPhase.Swing;
+	public bool LocksMovement =>
+		_phase is AttackPhase.Swing || (AnimDriver != null && AnimDriver.IsHurt);
+
+	/// <summary>Cancel swing/recovery immediately (hit interrupt).</summary>
+	public void Interrupt()
+	{
+		EndAttackImmediate();
+	}
 
 	public override void _Ready()
 	{
@@ -112,6 +119,11 @@ public partial class PlayerAttack : Node
 		switch (_phase)
 		{
 			case AttackPhase.Idle:
+				if (AnimDriver != null && AnimDriver.IsHurt)
+				{
+					break;
+				}
+
 				if (Input.IsActionJustPressed("heavy_attack"))
 				{
 					BeginSwing(heavy: true);

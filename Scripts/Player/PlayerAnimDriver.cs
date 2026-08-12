@@ -14,6 +14,7 @@ public partial class PlayerAnimDriver : Node
 		Walk,
 		Run,
 		Attack,
+		Hurt,
 		Death
 	}
 
@@ -25,7 +26,12 @@ public partial class PlayerAnimDriver : Node
 	[Export] public string RunClip { get; set; } = "run";
 	[Export] public string AttackClip { get; set; } = "attack";
 	[Export] public string HeavyAttackClip { get; set; } = "attack_heavy";
+	[Export] public string HurtClip { get; set; } = "stagger";
 	[Export] public string DeathClip { get; set; } = "death";
+
+	/// <summary>Ускорение hurt-клипа (stagger Mixamo обычно длинный).</summary>
+	[Export(PropertyHint.Range, "1,3,0.05")]
+	public float HurtSpeedScale { get; set; } = 2.1f;
 
 	/// <summary>Скорость (горизонт.), выше которой играем run вместо walk.</summary>
 	[Export]
@@ -60,6 +66,8 @@ public partial class PlayerAnimDriver : Node
 	public AnimKind CurrentKind => _kind;
 
 	public bool IsPlayingAttack => _kind == AnimKind.Attack;
+
+	public bool IsHurt => _kind == AnimKind.Hurt;
 
 	public bool IsHeavyAttack => _heavyAttack;
 
@@ -137,6 +145,7 @@ public partial class PlayerAnimDriver : Node
 		ConfigureLoop(RunClip, loop: true);
 		ConfigureLoop(AttackClip, loop: false);
 		ConfigureLoop(HeavyAttackClip, loop: false);
+		ConfigureLoop(HurtClip, loop: false);
 		ConfigureLoop(DeathClip, loop: false);
 		AnimPlayer.SpeedScale = 1f;
 		AnimPlayer.AnimationFinished += OnAnimationFinished;
@@ -154,7 +163,7 @@ public partial class PlayerAnimDriver : Node
 
 	public void UpdateLocomotion(float horizontalSpeed)
 	{
-		if (_kind is AnimKind.Attack or AnimKind.Death)
+		if (_kind is AnimKind.Attack or AnimKind.Hurt or AnimKind.Death)
 		{
 			return;
 		}
@@ -190,6 +199,11 @@ public partial class PlayerAnimDriver : Node
 
 	public void PlayAttack(bool heavy)
 	{
+		if (_kind == AnimKind.Death || _kind == AnimKind.Hurt)
+		{
+			return;
+		}
+
 		BindPlayer();
 		_heavyAttack = heavy;
 		if (AnimPlayer != null)
@@ -207,10 +221,29 @@ public partial class PlayerAnimDriver : Node
 		PlayKind(AnimKind.Attack, clip, 0.05f, forceRestart: true);
 	}
 
+	/// <summary>Hit react: interrupts attack/locomotion until clip ends.</summary>
+	public void PlayHurt()
+	{
+		if (_kind == AnimKind.Death)
+		{
+			return;
+		}
+
+		BindPlayer();
+		_heavyAttack = false;
+		if (AnimPlayer != null)
+		{
+			AnimPlayer.SpeedScale = HurtSpeedScale;
+		}
+
+		PlayKind(AnimKind.Hurt, HurtClip, 0.04f, forceRestart: true);
+	}
+
 	public void PlayDeath()
 	{
 		BindPlayer();
 		_deathPoseHeld = false;
+		_heavyAttack = false;
 		if (AnimPlayer != null)
 		{
 			AnimPlayer.SpeedScale = 1f;
@@ -300,7 +333,7 @@ public partial class PlayerAnimDriver : Node
 
 	private void OnAnimationFinished(StringName animName)
 	{
-		if (_kind == AnimKind.Attack)
+		if (_kind == AnimKind.Attack || _kind == AnimKind.Hurt)
 		{
 			_kind = AnimKind.None;
 			_current = "";
