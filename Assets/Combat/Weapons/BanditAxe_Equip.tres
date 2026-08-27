@@ -1,12 +1,10 @@
-[gd_resource type="Resource" script_class="WeaponEquipData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="WeaponEquipData" format=3]
 
 [ext_resource type="Script" path="res://Scripts/Combat/WeaponEquipData.cs" id="1_equip"]
 
 [resource]
 script = ExtResource("1_equip")
 DisplayName = "Bandit Axe"
-Slot = 1
-BoneName = "mixamorig:RightHand"
 WeaponPath = "res://Assets/ThirdParty/Weapons/one-handed-axe/Processed/BanditAxe.glb"
 WeaponNodeName = "BanditAxe"
 SocketAuthored = false
@@ -16,6 +14,22 @@ StrikeLocalRotationDegrees = Vector3(240, 90, 270)
 BladeSlideMeters = 0.28
 StrikeBladeSlideMeters = 0.2
 MeshPreRotationDegrees = Vector3(180, 0, 0)
-AlignLongestAxisToX = false
-RecenterGripToPommel = false
 TargetLengthMeters = 0.85
+BaseDamageN = 28
+Weight = 4.0
+Stance = 1
+SheatheBoneName = "mixamorig:Hips"
+SheatheLocalPosition = Vector3(0.17, 0.07999999, -0.03)
+SheatheLocalRotationDegrees = Vector3(0, 15, -80)
+IdleClip = "1h_idle"
+WalkClip = "1h_walk"
+RunClip = "1h_run"
+AttackClip = "1h_attack"
+HeavyAttackClip = "1h_attack_heavy"
+HurtClip = "1h_stagger"
+DrawClip = "1h_draw"
+SheatheClip = "1h_sheathe"
+AttackSpeedScale = 1.75
+HeavyAttackSpeedScale = 1.7
+LightHitWindows = PackedVector2Array(0.4, 0.56)
+HeavyHitWindows = PackedVector2Array(0.18, 0.3, 0.4, 0.52, 0.61, 0.74)

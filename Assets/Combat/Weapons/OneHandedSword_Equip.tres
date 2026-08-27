@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="WeaponEquipData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/Combat/WeaponEquipData.cs" id="1_equip"]
+
+[resource]
+script = ExtResource("1_equip")
+DisplayName = "Arming Sword"
+WeaponPath = "res://Assets/ThirdParty/Weapons/one-handed-sword/Processed/OneHandedSword.glb"
+WeaponNodeName = "ArmingSword"
+SocketAuthored = false
+LocalPosition = Vector3(-0.21000001, -0.22000001, 0.29)
+LocalRotationDegrees = Vector3(30, -165, -105)
+StrikeLocalRotationDegrees = Vector3(30, -165, -105)
+BladeSlideMeters = 0.29999998
+StrikeBladeSlideMeters = 0.29999998
+MeshPreRotationDegrees = Vector3(-150, 0, 0)
+SheatheMeshPreRotationDegrees = Vector3(180, 0, 0)
+TargetLengthMeters = 1.05
+BaseDamageN = 32
+Weight = 5.0
+Stance = 1
+SheatheBoneName = "mixamorig:Hips"
+SheatheLocalPosition = Vector3(0.21000002, 0.27, 0.4199999)
+SheatheLocalRotationDegrees = Vector3(0, -90, -50)
+IdleClip = "1h_idle"
+WalkClip = "1h_walk"
+RunClip = "1h_run"
+AttackClip = "1h_attack"
+HeavyAttackClip = "1h_attack_heavy"
+HurtClip = "1h_stagger"
+DrawClip = "1h_draw"
+SheatheClip = "1h_sheathe"
+AttackSpeedScale = 1.75
+HeavyAttackSpeedScale = 1.7
+LightHitWindows = PackedVector2Array(0.4, 0.56)
+HeavyHitWindows = PackedVector2Array(0.18, 0.3, 0.4, 0.52, 0.61, 0.74)

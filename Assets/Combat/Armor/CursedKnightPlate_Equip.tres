@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="ArmorEquipData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Combat/ArmorEquipData.cs" id="1_equip"]
+
+[resource]
+script = ExtResource("1_equip")
+DisplayName = "Cursed Knight Plate"
+PhysicalResist = 0.2
+Weight = 10.0

@@ -27,10 +27,12 @@ public partial class SliceHud : CanvasLayer
 	private Control? _filthTrack;
 	private ColorRect? _highMark;
 	private Label? _hintLabel;
+	private Label? _loadoutLabel;
 	private StyleBoxFlat? _healthFill;
 	private StyleBoxFlat? _filthFill;
 	private Health? _playerHealth;
 	private Blight? _playerFilth;
+	private PlayerLoadout? _playerLoadout;
 	private float _pulse;
 	private float _healthFlash;
 	private float _hintAge;
@@ -98,7 +100,7 @@ public partial class SliceHud : CanvasLayer
 			OffsetLeft = 24,
 			OffsetTop = 22,
 			OffsetRight = 430,
-			OffsetBottom = 175
+			OffsetBottom = 210
 		};
 		AddChild(_root);
 
@@ -135,9 +137,13 @@ public partial class SliceHud : CanvasLayer
 		};
 		_filthTrack.AddChild(_highMark);
 
+		_loadoutLabel = MakeLabel("Loadout");
+		_loadoutLabel.AddThemeFontSizeOverride("font_size", 15);
+		column.AddChild(_loadoutLabel);
+
 		_hintLabel = new Label
 		{
-			Text = "LMB strike  ·  RMB heavy (+FILTH)  ·  Altar cleanses",
+			Text = "LMB strike  ·  RMB heavy (+FILTH)  ·  R draw/sheathe  ·  1/2 weapons  ·  Altar cleanses",
 			AnchorTop = 1f,
 			AnchorBottom = 1f,
 			AnchorLeft = 0f,
@@ -244,6 +250,7 @@ public partial class SliceHud : CanvasLayer
 
 		if (_filthBar == null || _filthLabel == null)
 		{
+			UpdateLoadoutLine();
 			return;
 		}
 
@@ -251,6 +258,7 @@ public partial class SliceHud : CanvasLayer
 		{
 			_filthBar.Value = 0;
 			_filthLabel.Text = "FILTH  —";
+			UpdateLoadoutLine();
 			return;
 		}
 
@@ -284,6 +292,19 @@ public partial class SliceHud : CanvasLayer
 		}
 
 		_filthLabel.Text = $"FILTH  {_playerFilth.Current:0}/{_playerFilth.MaxBlight:0}{state}{mulText}";
+		UpdateLoadoutLine();
+	}
+
+	private void UpdateLoadoutLine()
+	{
+		if (_loadoutLabel == null)
+		{
+			return;
+		}
+
+		_loadoutLabel.Text = string.IsNullOrEmpty(_playerLoadout?.HudLine)
+			? "Loadout  —"
+			: _playerLoadout.HudLine;
 	}
 
 	private void UpdateHighMark()
@@ -314,6 +335,7 @@ public partial class SliceHud : CanvasLayer
 			?? GetTree().GetFirstNodeInGroup("player") as Node3D;
 		_playerHealth = player?.GetNodeOrNull<Health>("Health");
 		_playerFilth = player?.GetNodeOrNull<Blight>("Blight");
+		_playerLoadout = player?.GetNodeOrNull<PlayerLoadout>("Loadout");
 
 		if (_playerHealth != null)
 		{

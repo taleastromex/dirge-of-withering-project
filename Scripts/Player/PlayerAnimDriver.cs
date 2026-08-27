@@ -25,6 +25,7 @@ public partial class PlayerAnimDriver : Node
 	[Export] public string WalkClip { get; set; } = "walk";
 	[Export] public string RunClip { get; set; } = "run";
 	[Export] public string AttackClip { get; set; } = "attack";
+	[Export] public string AttackAltClip { get; set; } = "";
 	[Export] public string HeavyAttackClip { get; set; } = "attack_heavy";
 	[Export] public string HurtClip { get; set; } = "stagger";
 	[Export] public string DeathClip { get; set; } = "death";
@@ -52,10 +53,22 @@ public partial class PlayerAnimDriver : Node
 	public float AttackHitNormEnd { get; set; } = 0.58f;
 
 	[Export(PropertyHint.Range, "0,1,0.01")]
-	public float HeavyAttackHitNormStart { get; set; } = 0.58f;
+	public float HeavyAttackHitNormStart { get; set; } = 0.18f;
 
 	[Export(PropertyHint.Range, "0,1,0.01")]
-	public float HeavyAttackHitNormEnd { get; set; } = 0.78f;
+	public float HeavyAttackHitNormEnd { get; set; } = 0.82f;
+
+	/// <summary>If set, heavy attacks use these pulses instead of a single HeavyAttackHit window.</summary>
+	public Vector2[] HeavyHitWindows { get; set; } = System.Array.Empty<Vector2>();
+
+	/// <summary>If set, light attacks use these pulses instead of a single AttackHit window.</summary>
+	public Vector2[] LightHitWindows { get; set; } = System.Array.Empty<Vector2>();
+
+	[Export(PropertyHint.Range, "0.5,3,0.05")]
+	public float AttackSpeedScale { get; set; } = 1f;
+
+	[Export(PropertyHint.Range, "0.5,3,0.05")]
+	public float HeavyAttackSpeedScale { get; set; } = 1f;
 
 	/// <summary>Stop clips and hold bind / T-pose (weapon grip tuning).</summary>
 	[Export]
@@ -66,6 +79,9 @@ public partial class PlayerAnimDriver : Node
 	private bool _bound;
 	private bool _deathPoseHeld;
 	private bool _heavyAttack;
+	private bool _equipPlayback;
+	private bool _equipReverse;
+	private int _lightComboIndex;
 
 	public AnimKind CurrentKind => _kind;
 
@@ -75,6 +91,10 @@ public partial class PlayerAnimDriver : Node
 
 	public bool IsHeavyAttack => _heavyAttack;
 
+	public bool IsEquipPlayback => _equipPlayback;
+
+	public bool IsEquipReverse => _equipReverse;
+
 	public override void _Ready()
 	{
 		CallDeferred(MethodName.BindPlayer);
@@ -82,32 +102,35 @@ public partial class PlayerAnimDriver : Node
 
 	public void GetAttackHitWindow(out float start, out float end)
 	{
-		start = _heavyAttack ? HeavyAttackHitNormStart : AttackHitNormStart;
-		end = _heavyAttack ? HeavyAttackHitNormEnd : AttackHitNormEnd;
+		Vector2[] windows = ResolveHitWindows();
+		start = windows[0].X;
+		end = windows[^1].Y;
 	}
 
-	/// <summary>
-	/// 0 = idle grip, 1 = fully extended strike grip.
-	/// Ramps in before the hitbox window and out after it.
-	/// </summary>
-	public float GetWeaponStrikeWeight(float blendInNorm = 0.1f, float blendOutNorm = 0.14f)
+	private Vector2[] ResolveHitWindows()
 	{
-		if (_kind != AnimKind.Attack)
+		if (_heavyAttack && HeavyHitWindows is { Length: > 0 })
 		{
-			return 0f;
+			return HeavyHitWindows;
 		}
 
-		float len = GetCurrentLength();
-		if (len <= 0.01f)
+		if (!_heavyAttack && LightHitWindows is { Length: > 0 })
 		{
-			return 0f;
+			return LightHitWindows;
 		}
 
-		float t = GetCurrentPosition() / len;
-		GetAttackHitWindow(out float hitStart, out float hitEnd);
+		if (_heavyAttack)
+		{
+			return new[] { new Vector2(HeavyAttackHitNormStart, HeavyAttackHitNormEnd) };
+		}
+
+		return new[] { new Vector2(AttackHitNormStart, AttackHitNormEnd) };
+	}
+
+	private static float WindowStrikeWeight(float t, float hitStart, float hitEnd, float blendInNorm, float blendOutNorm)
+	{
 		float rampIn = Mathf.Max(0f, hitStart - Mathf.Max(0.01f, blendInNorm));
 		float rampOut = Mathf.Min(1f, hitEnd + Mathf.Max(0.01f, blendOutNorm));
-
 		if (t <= rampIn || t >= rampOut)
 		{
 			return 0f;
@@ -124,6 +147,33 @@ public partial class PlayerAnimDriver : Node
 		}
 
 		return 1f - SmoothStep(hitEnd, rampOut, t);
+	}
+
+	/// <summary>
+	/// 0 = idle grip, 1 = fully extended strike grip.
+	/// Ramps in before the hitbox window and out after it.
+	/// </summary>
+	public float GetWeaponStrikeWeight(float blendInNorm = 0.1f, float blendOutNorm = 0.14f)
+	{
+		if (_kind != AnimKind.Attack || _equipPlayback)
+		{
+			return 0f;
+		}
+
+		float len = GetCurrentLength();
+		if (len <= 0.01f)
+		{
+			return 0f;
+		}
+
+		float t = GetCurrentPosition() / len;
+		float best = 0f;
+		foreach (Vector2 window in ResolveHitWindows())
+		{
+			best = Mathf.Max(best, WindowStrikeWeight(t, window.X, window.Y, blendInNorm, blendOutNorm));
+		}
+
+		return best;
 	}
 
 	private static float SmoothStep(float edge0, float edge1, float x)
@@ -201,6 +251,96 @@ public partial class PlayerAnimDriver : Node
 		}
 	}
 
+	public void ApplyClipSet(
+		string idle,
+		string walk,
+		string run,
+		string attack,
+		string heavy,
+		string hurt,
+		string attackAlt = "")
+	{
+		IdleClip = idle;
+		WalkClip = walk;
+		RunClip = run;
+		AttackClip = attack;
+		AttackAltClip = attackAlt;
+		HeavyAttackClip = heavy;
+		HurtClip = hurt;
+		_lightComboIndex = 0;
+		if (!_bound)
+		{
+			return;
+		}
+
+		ConfigureLoop(IdleClip, loop: true);
+		ConfigureLoop(WalkClip, loop: true);
+		ConfigureLoop(RunClip, loop: true);
+		ConfigureLoop(AttackClip, loop: false);
+		ConfigureLoop(AttackAltClip, loop: false);
+		ConfigureLoop(HeavyAttackClip, loop: false);
+		ConfigureLoop(HurtClip, loop: false);
+		Skeleton3D? skeleton = FindSkeleton(GetParent() ?? this);
+		skeleton?.ResetBonePoses();
+		if (_kind is AnimKind.Idle or AnimKind.Walk or AnimKind.Run or AnimKind.None)
+		{
+			_current = "";
+			PlayIdle();
+		}
+	}
+
+	public bool HasClip(string clip) => !string.IsNullOrEmpty(clip) && ResolveClip(clip) != null;
+
+	public bool TryPlayEquipClip(string clip)
+	{
+		if (HoldRestPose || _kind == AnimKind.Death || _kind == AnimKind.Hurt)
+		{
+			return false;
+		}
+
+		if (!HasClip(clip))
+		{
+			return false;
+		}
+
+		BindPlayer();
+		_heavyAttack = false;
+		if (AnimPlayer != null)
+		{
+			AnimPlayer.SpeedScale = 1f;
+		}
+
+		PlayKind(AnimKind.Attack, clip, 0.08f, forceRestart: true, reverse: false);
+		_equipPlayback = true;
+		_equipReverse = false;
+		return true;
+	}
+
+	public bool TryPlayEquipClipBackwards(string clip)
+	{
+		if (HoldRestPose || _kind == AnimKind.Death || _kind == AnimKind.Hurt)
+		{
+			return false;
+		}
+
+		if (!HasClip(clip))
+		{
+			return false;
+		}
+
+		BindPlayer();
+		_heavyAttack = false;
+		if (AnimPlayer != null)
+		{
+			AnimPlayer.SpeedScale = 1f;
+		}
+
+		PlayKind(AnimKind.Attack, clip, 0.08f, forceRestart: true, reverse: true);
+		_equipPlayback = true;
+		_equipReverse = true;
+		return true;
+	}
+
 	public void PlayIdle() => PlayKind(AnimKind.Idle, IdleClip, 0.2f, forceRestart: false);
 
 	public void PlayWalk() => PlayKind(AnimKind.Walk, WalkClip, 0.15f, forceRestart: false);
@@ -221,6 +361,8 @@ public partial class PlayerAnimDriver : Node
 		_current = "";
 		_deathPoseHeld = false;
 		_heavyAttack = false;
+		_equipPlayback = false;
+		_equipReverse = false;
 
 		Skeleton3D? skeleton = FindSkeleton(GetParent() ?? this);
 		if (skeleton == null)
@@ -245,19 +387,36 @@ public partial class PlayerAnimDriver : Node
 
 		BindPlayer();
 		_heavyAttack = heavy;
+		_equipPlayback = false;
+		_equipReverse = false;
 		if (AnimPlayer != null)
 		{
-			AnimPlayer.SpeedScale = 1f;
+			AnimPlayer.SpeedScale = heavy ? HeavyAttackSpeedScale : AttackSpeedScale;
 		}
 
-		string clip = heavy ? HeavyAttackClip : AttackClip;
-		if (ResolveClip(clip) == null)
-		{
-			clip = AttackClip;
-			_heavyAttack = false;
-		}
-
+		string clip = ResolveAttackClip(heavy);
 		PlayKind(AnimKind.Attack, clip, 0.05f, forceRestart: true);
+	}
+
+	private string ResolveAttackClip(bool heavy)
+	{
+		if (heavy)
+		{
+			_lightComboIndex = 0;
+			if (ResolveClip(HeavyAttackClip) != null)
+			{
+				return HeavyAttackClip;
+			}
+
+			_heavyAttack = false;
+			return AttackClip;
+		}
+
+		bool useAlt = _lightComboIndex % 2 == 1
+			&& !string.IsNullOrEmpty(AttackAltClip)
+			&& ResolveClip(AttackAltClip) != null;
+		_lightComboIndex++;
+		return useAlt ? AttackAltClip : AttackClip;
 	}
 
 	/// <summary>Hit react: interrupts attack/locomotion until clip ends.</summary>
@@ -298,6 +457,8 @@ public partial class PlayerAnimDriver : Node
 			_kind = AnimKind.None;
 			_current = "";
 			_heavyAttack = false;
+			_equipPlayback = false;
+			_equipReverse = false;
 			if (AnimPlayer != null)
 			{
 				AnimPlayer.SpeedScale = 1f;
@@ -313,6 +474,18 @@ public partial class PlayerAnimDriver : Node
 		}
 
 		return (float)AnimPlayer.CurrentAnimationLength;
+	}
+
+	public float GetPlaybackDuration()
+	{
+		float len = GetCurrentLength();
+		if (AnimPlayer == null)
+		{
+			return len;
+		}
+
+		float speed = Mathf.Abs(AnimPlayer.SpeedScale);
+		return speed > 0.01f ? len / speed : len;
 	}
 
 	public float GetCurrentPosition()
@@ -339,9 +512,15 @@ public partial class PlayerAnimDriver : Node
 		}
 
 		float t = GetCurrentPosition() / len;
-		float start = _heavyAttack ? HeavyAttackHitNormStart : AttackHitNormStart;
-		float end = _heavyAttack ? HeavyAttackHitNormEnd : AttackHitNormEnd;
-		return t >= start && t <= end;
+		foreach (Vector2 window in ResolveHitWindows())
+		{
+			if (t >= window.X && t <= window.Y)
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public bool IsAttackFinished()
@@ -357,7 +536,17 @@ public partial class PlayerAnimDriver : Node
 		}
 
 		float len = GetCurrentLength();
-		return len > 0.01f && GetCurrentPosition() >= len - 0.02f;
+		if (len <= 0.01f)
+		{
+			return true;
+		}
+
+		if (_equipReverse)
+		{
+			return GetCurrentPosition() <= 0.02f;
+		}
+
+		return GetCurrentPosition() >= len - 0.02f;
 	}
 
 	private void SetLocomotionScale(float scale)
@@ -377,6 +566,8 @@ public partial class PlayerAnimDriver : Node
 			_kind = AnimKind.None;
 			_current = "";
 			_heavyAttack = false;
+			_equipPlayback = false;
+			_equipReverse = false;
 			return;
 		}
 
@@ -397,7 +588,7 @@ public partial class PlayerAnimDriver : Node
 		_deathPoseHeld = true;
 	}
 
-	private void PlayKind(AnimKind kind, string clip, float blend, bool forceRestart)
+	private void PlayKind(AnimKind kind, string clip, float blend, bool forceRestart, bool reverse = false)
 	{
 		BindPlayer();
 		if (AnimPlayer == null || string.IsNullOrEmpty(clip))
@@ -421,7 +612,14 @@ public partial class PlayerAnimDriver : Node
 			return;
 		}
 
-		AnimPlayer.Play(resolved, customBlend: blend);
+		if (reverse)
+		{
+			AnimPlayer.PlayBackwards(resolved, customBlend: blend);
+		}
+		else
+		{
+			AnimPlayer.Play(resolved, customBlend: blend);
+		}
 		_current = resolved;
 		_kind = kind;
 	}

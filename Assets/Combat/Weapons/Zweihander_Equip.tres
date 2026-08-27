@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="WeaponEquipData" format=3]
+
+[ext_resource type="Script" path="res://Scripts/Combat/WeaponEquipData.cs" id="1_equip"]
+
+[resource]
+script = ExtResource("1_equip")
+DisplayName = "Zweihander"
+WeaponPath = "res://Assets/ThirdParty/Weapons/zweihander.glb"
+WeaponNodeName = "Zweihander"
+SocketAuthored = false
+LocalPosition = Vector3(0, 0.11, 0.07999999)
+LocalRotationDegrees = Vector3(-105, 75, -60)
+StrikeLocalRotationDegrees = Vector3(-105, 75, -60)
+BladeSlideMeters = 0.33
+StrikeBladeSlideMeters = 0.33
+MeshPreRotationDegrees = Vector3(-30, 0, 0)
+SheatheMeshPreRotationDegrees = Vector3(-30, 0, 0)
+TargetLengthMeters = 1.65
+SheatheLocalPosition = Vector3(-0.28, 0.5899998, -0.079999976)
+SheatheLocalRotationDegrees = Vector3(-165, -120, 105)
+IdleClip = "idle"
+WalkClip = "walk"
+RunClip = "run"
+AttackClip = "attack"
+HeavyAttackClip = "attack_heavy"
+HurtClip = "stagger"
+DrawClip = "2h_draw"
+SheatheClip = "2h_sheathe"
+HeavyHitWindows = PackedVector2Array(0.16, 0.28, 0.42, 0.55, 0.68, 0.81)

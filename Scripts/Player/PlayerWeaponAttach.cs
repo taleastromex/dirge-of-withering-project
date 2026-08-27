@@ -75,6 +75,9 @@ public partial class PlayerWeaponAttach : Node
 	[Export]
 	public float GripTuneStepDegrees { get; set; } = 15f;
 
+	private WeaponEquipData? _equip;
+	private bool _drawn;
+	private bool _gripTuneTPose;
 	private Skeleton3D? _skeleton;
 	private int _boneIdx = -1;
 	private Node3D? _weapon;
@@ -86,6 +89,19 @@ public partial class PlayerWeaponAttach : Node
 	private Label? _gripTuneHud;
 	private CanvasLayer? _gripTuneLayer;
 	private string _lastInputDebug = "click buttons below (keys optional)";
+	private SocketPose _handPose;
+	private SocketPose _sheathePose;
+
+	private struct SocketPose
+	{
+		public string Bone;
+		public Vector3 Pos;
+		public Vector3 Rot;
+		public Vector3 StrikeRot;
+		public Vector3 Pre;
+		public float Slide;
+		public float StrikeSlide;
+	}
 
 	public override void _Ready()
 	{
@@ -97,6 +113,157 @@ public partial class PlayerWeaponAttach : Node
 		{
 			CallDeferred(nameof(BeginGripTuneMode));
 		}
+	}
+
+	public void Equip(WeaponEquipData? data)
+	{
+		if (_equip != null && data != _equip)
+		{
+			FlushActiveSocketToBuffer();
+			WriteActiveSocketToEquip();
+		}
+
+		_equip = data;
+		if (data != null)
+		{
+			WeaponScene = data.WeaponScene;
+			if (!string.IsNullOrEmpty(data.WeaponPath))
+			{
+				WeaponPath = data.WeaponPath;
+			}
+
+			if (data.TargetLengthMeters > 0f)
+			{
+				TargetLengthMeters = data.TargetLengthMeters;
+			}
+
+			LoadSocketsFromEquip(data);
+		}
+
+		RebuildWeapon();
+		ApplyDrawnBone();
+	}
+
+	public void SetDrawn(bool drawn)
+	{
+		_drawn = drawn;
+		ApplyDrawnBone();
+		if (_weapon != null && GodotObject.IsInstanceValid(_weapon))
+		{
+			_weapon.Visible = true;
+		}
+	}
+
+	private void RebuildWeapon()
+	{
+		if (_weapon != null && GodotObject.IsInstanceValid(_weapon))
+		{
+			_weapon.QueueFree();
+		}
+
+		_weapon = null;
+		if (_skeleton != null)
+		{
+			AttachWeapon();
+		}
+	}
+
+	private void ApplyDrawnBoneFields()
+	{
+		if (_equip == null)
+		{
+			return;
+		}
+
+		SocketPose pose = _drawn ? _handPose : _sheathePose;
+		if (string.IsNullOrEmpty(pose.Bone))
+		{
+			LoadSocketsFromEquip(_equip);
+			pose = _drawn ? _handPose : _sheathePose;
+		}
+
+		BoneName = pose.Bone;
+		GripLocalPosition = pose.Pos;
+		GripLocalRotationDegrees = pose.Rot;
+		StrikeGripLocalRotationDegrees = pose.StrikeRot;
+		MeshPreRotationDegrees = pose.Pre;
+		BladeSlideMeters = pose.Slide;
+		StrikeBladeSlideMeters = pose.StrikeSlide;
+	}
+
+	private void LoadSocketsFromEquip(WeaponEquipData equip)
+	{
+		_handPose = new SocketPose
+		{
+			Bone = string.IsNullOrEmpty(equip.BoneName) ? "mixamorig:RightHand" : equip.BoneName,
+			Pos = equip.LocalPosition,
+			Rot = equip.LocalRotationDegrees,
+			StrikeRot = equip.ResolveStrikeRotationDegrees(),
+			Pre = equip.MeshPreRotationDegrees,
+			Slide = equip.BladeSlideMeters,
+			StrikeSlide = equip.StrikeBladeSlideMeters
+		};
+		_sheathePose = new SocketPose
+		{
+			Bone = ResolveSheatheBoneName(equip),
+			Pos = equip.SheatheLocalPosition,
+			Rot = equip.SheatheLocalRotationDegrees,
+			StrikeRot = equip.SheatheLocalRotationDegrees,
+			Pre = equip.SheatheMeshPreRotationDegrees,
+			Slide = equip.SheatheBladeSlideMeters,
+			StrikeSlide = equip.SheatheBladeSlideMeters
+		};
+	}
+
+	private void FlushActiveSocketToBuffer()
+	{
+		if (_equip == null)
+		{
+			return;
+		}
+
+		SocketPose pose = new()
+		{
+			Bone = BoneName,
+			Pos = GripLocalPosition,
+			Rot = GripLocalRotationDegrees,
+			StrikeRot = StrikeGripLocalRotationDegrees,
+			Pre = MeshPreRotationDegrees,
+			Slide = BladeSlideMeters,
+			StrikeSlide = StrikeBladeSlideMeters
+		};
+		if (_drawn)
+		{
+			_handPose = pose;
+		}
+		else
+		{
+			_sheathePose = pose;
+		}
+	}
+
+	private static string ResolveSheatheBoneName(WeaponEquipData equip)
+	{
+		if (!string.IsNullOrEmpty(equip.SheatheBoneName))
+		{
+			return equip.SheatheBoneName;
+		}
+
+		return equip.Stance == WeaponStance.OneHand ? "mixamorig:Hips" : "mixamorig:Spine2";
+	}
+
+	private void ApplyDrawnBone()
+	{
+		ApplyDrawnBoneFields();
+		if (_skeleton == null)
+		{
+			return;
+		}
+
+		_boneIdx = ResolveBoneIndex(_skeleton);
+		RebuildGripQuats();
+		ApplyMeshPreRotationToChildren();
+		ApplyGripPose(0f);
 	}
 
 	public override void _Input(InputEvent @event)
@@ -207,22 +374,107 @@ public partial class PlayerWeaponAttach : Node
 			grip.Z = WrapDegrees(grip.Z);
 			MeshPreRotationDegrees = pre;
 			GripLocalRotationDegrees = grip;
-			StrikeGripLocalRotationDegrees = grip;
-			StrikeBladeSlideMeters = BladeSlideMeters;
+			if (_drawn)
+			{
+				StrikeGripLocalRotationDegrees = grip;
+				StrikeBladeSlideMeters = BladeSlideMeters;
+			}
+			else
+			{
+				StrikeGripLocalRotationDegrees = grip;
+			}
+
+			WriteActiveSocketToEquip();
 		}
 
 		RebuildGripQuats();
 		ApplyMeshPreRotationToChildren();
 		ApplyGripPose(0f);
 		UpdateGripTuneHud();
+		PrintGripTuneLine();
+	}
 
+	private void WriteActiveSocketToEquip()
+	{
+		if (_equip == null)
+		{
+			return;
+		}
+
+		FlushActiveSocketToBuffer();
+		_equip.BoneName = _handPose.Bone;
+		_equip.LocalPosition = _handPose.Pos;
+		_equip.LocalRotationDegrees = _handPose.Rot;
+		_equip.StrikeLocalRotationDegrees = _handPose.StrikeRot;
+		_equip.MeshPreRotationDegrees = _handPose.Pre;
+		_equip.BladeSlideMeters = _handPose.Slide;
+		_equip.StrikeBladeSlideMeters = _handPose.StrikeSlide;
+		_equip.SheatheBoneName = _sheathePose.Bone;
+		_equip.SheatheLocalPosition = _sheathePose.Pos;
+		_equip.SheatheLocalRotationDegrees = _sheathePose.Rot;
+		_equip.SheatheMeshPreRotationDegrees = _sheathePose.Pre;
+		_equip.SheatheBladeSlideMeters = _sheathePose.Slide;
+	}
+
+	private void PrintGripTuneLine()
+	{
 		Vector3 g = GripLocalRotationDegrees;
 		Vector3 p = GripLocalPosition;
+		string slot = _drawn ? "HAND" : "SHEATHE";
+		string path = _equip?.ResourcePath ?? "";
 		GD.Print(
-			"[GripTune] " +
-			$"preX={MeshPreRotationDegrees.X:0.#}  gripRot=({g.X:0.#}, {g.Y:0.#}, {g.Z:0.#})  " +
-			$"pos=({p.X:0.###}, {p.Y:0.###}, {p.Z:0.###})  slide={BladeSlideMeters:0.###}  " +
-			$"weapon={(_weapon != null ? "OK" : "NULL")}");
+			$"[GripTune {slot}] {(_equip?.DisplayName ?? "?")} {path}\n" +
+			$"  bone={BoneName}  preX={MeshPreRotationDegrees.X:0.#}\n" +
+			$"  rot=({g.X:0.#}, {g.Y:0.#}, {g.Z:0.#})  pos=({p.X:0.###}, {p.Y:0.###}, {p.Z:0.###})  " +
+			$"slide={BladeSlideMeters:0.###}");
+	}
+
+	private void SaveEquipResource()
+	{
+		WriteActiveSocketToEquip();
+		if (_equip == null || string.IsNullOrEmpty(_equip.ResourcePath))
+		{
+			GD.PushWarning("[GripTune] no WeaponEquipData path to save.");
+			return;
+		}
+
+		Error err = ResourceSaver.Save(_equip, _equip.ResourcePath);
+		GD.Print(err == Error.Ok
+			? $"[GripTune] saved {_equip.ResourcePath}"
+			: $"[GripTune] save failed {err} {_equip.ResourcePath}");
+	}
+
+	private void SetGripTuneDrawn(bool drawn)
+	{
+		FlushActiveSocketToBuffer();
+		WriteActiveSocketToEquip();
+		if (GetParent()?.GetNodeOrNull<PlayerLoadout>("Loadout") is PlayerLoadout loadout)
+		{
+			loadout.SetDrawnImmediate(drawn);
+		}
+		else
+		{
+			SetDrawn(drawn);
+		}
+
+		ApplyMeshPreRotationToChildren();
+		UpdateGripTuneHud();
+	}
+
+	private void SetGripTuneTPose(bool on)
+	{
+		_gripTuneTPose = on;
+		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
+		if (AnimDriver != null)
+		{
+			AnimDriver.HoldRestPose = on;
+			if (on)
+			{
+				AnimDriver.ForceRestPose();
+			}
+		}
+
+		UpdateGripTuneHud();
 	}
 
 	private void RebuildGripQuats()
@@ -260,17 +512,31 @@ public partial class PlayerWeaponAttach : Node
 		}
 
 		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
-		if (AnimDriver != null)
-		{
-			AnimDriver.HoldRestPose = true;
-			AnimDriver.ForceRestPose();
-		}
+		SetGripTuneTPose(false);
+		HaltSceneEnemies();
 
 		EnsureGripTuneHud();
 		UpdateGripTuneHud();
 		GD.Print(
-			"[GripTune] Player T-pose. Use ON-SCREEN BUTTONS (keyboard often blocked by editor focus).\n" +
+			"[GripTune] Idle stays playing (T-pose optional). Buttons: HAND / SHEATHE / SAVE .tres.\n" +
 			$"  weapon={(_weapon != null ? _weapon.Name : "NULL")} bone={_boneIdx}");
+	}
+
+	private void HaltSceneEnemies()
+	{
+		SceneTree? tree = GetTree();
+		if (tree == null)
+		{
+			return;
+		}
+
+		foreach (Node node in tree.GetNodesInGroup("enemies"))
+		{
+			if (node is BasicEnemy enemy)
+			{
+				enemy.HaltForAuthoring();
+			}
+		}
 	}
 
 	private void EnsureGripTuneHud()
@@ -301,9 +567,34 @@ public partial class PlayerWeaponAttach : Node
 		root.AddChild(MakeTuneRow("posZ", () => NudgePos(new Vector3(0f, 0f, -0.01f)), () => NudgePos(new Vector3(0f, 0f, 0.01f))));
 		root.AddChild(MakeTuneRow("slide", () => NudgeSlide(-0.01f), () => NudgeSlide(0.01f)));
 
+		var socketRow = new HBoxContainer();
+		var handBtn = new Button { Text = "HAND", CustomMinimumSize = new Vector2(90, 32) };
+		var sheatheBtn = new Button { Text = "SHEATHE", CustomMinimumSize = new Vector2(90, 32) };
+		handBtn.Pressed += () => SetGripTuneDrawn(true);
+		sheatheBtn.Pressed += () => SetGripTuneDrawn(false);
+		socketRow.AddChild(handBtn);
+		socketRow.AddChild(sheatheBtn);
+		root.AddChild(socketRow);
+
+		var tposeBtn = new Button { Text = "toggle T-POSE" };
+		tposeBtn.Pressed += () => SetGripTuneTPose(!_gripTuneTPose);
+		root.AddChild(tposeBtn);
+
+		var nextBtn = new Button { Text = "next weapon" };
+		nextBtn.Pressed += () =>
+		{
+			GetParent()?.GetNodeOrNull<PlayerLoadout>("Loadout")?.CycleWeaponForTune(1);
+			UpdateGripTuneHud();
+		};
+		root.AddChild(nextBtn);
+
 		var printBtn = new Button { Text = "PRINT [GripTune] line" };
 		printBtn.Pressed += () => CommitGripTune(printOnly: true);
 		root.AddChild(printBtn);
+
+		var saveBtn = new Button { Text = "SAVE .tres" };
+		saveBtn.Pressed += SaveEquipResource;
+		root.AddChild(saveBtn);
 
 		_gripTuneLayer.AddChild(root);
 		GetTree()?.Root.AddChild(_gripTuneLayer);
@@ -332,14 +623,14 @@ public partial class PlayerWeaponAttach : Node
 
 		Vector3 g = GripLocalRotationDegrees;
 		Vector3 p = GripLocalPosition;
-		bool focused = GetWindow()?.HasFocus() ?? false;
 		string weapon = _weapon != null ? "OK" : "NULL";
 		_gripTuneHud.AddThemeColorOverride(
 			"font_color",
 			weapon == "OK" ? new Color(1f, 0.85f, 0.2f) : new Color(1f, 0.25f, 0.2f));
 		_gripTuneHud.Text =
-			$"GRIPTUNE  weapon={weapon}  focus={(focused ? "YES" : "NO")}\n" +
-			$"preX={MeshPreRotationDegrees.X:0.#}  grip=({g.X:0.#},{g.Y:0.#},{g.Z:0.#})\n" +
+			$"GRIPTUNE  {(_drawn ? "HAND" : "SHEATHE")}  tpose={(_gripTuneTPose ? "ON" : "OFF")}  " +
+			$"weapon={weapon}  {(_equip?.DisplayName ?? "")}\n" +
+			$"bone={BoneName}  preX={MeshPreRotationDegrees.X:0.#}  grip=({g.X:0.#},{g.Y:0.#},{g.Z:0.#})\n" +
 			$"pos=({p.X:0.###},{p.Y:0.###},{p.Z:0.###})  slide={BladeSlideMeters:0.###}\n" +
 			$"last: {_lastInputDebug}";
 	}
@@ -348,7 +639,11 @@ public partial class PlayerWeaponAttach : Node
 	{
 		if (GripTuneMode)
 		{
-			AnimDriver?.ForceRestPose();
+			if (_gripTuneTPose)
+			{
+				AnimDriver?.ForceRestPose();
+			}
+
 			UpdateGripTuneHud();
 		}
 
@@ -357,7 +652,7 @@ public partial class PlayerWeaponAttach : Node
 			return;
 		}
 
-		float strike = GripTuneMode
+		float strike = GripTuneMode || !_drawn
 			? 0f
 			: AnimDriver?.GetWeaponStrikeWeight(StrikeBlendInNorm, StrikeBlendOutNorm) ?? 0f;
 
@@ -442,7 +737,7 @@ public partial class PlayerWeaponAttach : Node
 
 		Node3D? visual = GetParent()?.GetNodeOrNull<Node3D>("Visual");
 		(visual ?? GetParent())?.AddChild(_weapon);
-		_weapon.Name = "Zweihander";
+		_weapon.Name = _equip?.WeaponNodeName ?? "Weapon";
 
 		RebuildGripQuats();
 		AnimDriver ??= GetNodeOrNull<PlayerAnimDriver>("../AnimDriver");
@@ -554,13 +849,26 @@ public partial class PlayerWeaponAttach : Node
 
 	private int ResolveBoneIndex(Skeleton3D skeleton)
 	{
+		if (string.IsNullOrEmpty(BoneName))
+		{
+			GD.PushWarning("PlayerWeaponAttach: empty bone name.");
+			return -1;
+		}
+
 		int bone = skeleton.FindBone(BoneName);
 		if (bone >= 0)
 		{
 			return bone;
 		}
 
-		bone = skeleton.FindBone(BoneName.Replace("mixamorig:", string.Empty));
+		string shortName = BoneName;
+		int colon = BoneName.LastIndexOf(':');
+		if (colon >= 0 && colon < BoneName.Length - 1)
+		{
+			shortName = BoneName[(colon + 1)..];
+		}
+
+		bone = skeleton.FindBone(shortName);
 		if (bone >= 0)
 		{
 			return bone;
@@ -569,23 +877,14 @@ public partial class PlayerWeaponAttach : Node
 		for (int i = 0; i < skeleton.GetBoneCount(); i++)
 		{
 			string name = skeleton.GetBoneName(i);
-			if (!name.Contains("RightHand", System.StringComparison.OrdinalIgnoreCase))
+			if (name.Equals(shortName, System.StringComparison.OrdinalIgnoreCase)
+				|| name.EndsWith(shortName, System.StringComparison.OrdinalIgnoreCase))
 			{
-				continue;
+				return i;
 			}
-
-			if (name.Contains("Index", System.StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("Thumb", System.StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("Middle", System.StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("Ring", System.StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("Pinky", System.StringComparison.OrdinalIgnoreCase))
-			{
-				continue;
-			}
-
-			return i;
 		}
 
+		GD.PushWarning($"PlayerWeaponAttach: bone '{BoneName}' not found. Sample: {DumpBoneNames(skeleton)}");
 		return -1;
 	}
 

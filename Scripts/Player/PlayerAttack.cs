@@ -83,8 +83,11 @@ public partial class PlayerAttack : Node
 
 	public bool IsAttacking => _phase is AttackPhase.Swing;
 
+	public bool IsBusy => _phase is not AttackPhase.Idle;
+
 	public bool LocksMovement =>
-		_phase is AttackPhase.Swing || (AnimDriver != null && AnimDriver.IsHurt);
+		_phase is AttackPhase.Swing
+		|| (AnimDriver != null && (AnimDriver.IsHurt || AnimDriver.IsPlayingAttack));
 
 	/// <summary>Cancel swing/recovery immediately (hit interrupt).</summary>
 	public void Interrupt()
@@ -128,7 +131,7 @@ public partial class PlayerAttack : Node
 					break;
 				}
 
-				if (AnimDriver != null && AnimDriver.IsHurt)
+				if (AnimDriver != null && (AnimDriver.IsHurt || AnimDriver.IsPlayingAttack))
 				{
 					break;
 				}
@@ -173,9 +176,14 @@ public partial class PlayerAttack : Node
 		_hitboxWasActive = false;
 		Hitbox?.SetActive(false);
 		ApplyHitboxTuning(heavy);
+		if (GetParent()?.GetNodeOrNull<PlayerLoadout>("Loadout") is PlayerLoadout loadout)
+		{
+			loadout.NotifyAttackStarted();
+		}
+
 		AnimDriver?.PlayAttack(heavy);
 
-		float len = AnimDriver?.GetCurrentLength() ?? 0f;
+		float len = AnimDriver?.GetPlaybackDuration() ?? 0f;
 		float fallback = heavy ? HeavyAttackFallbackDuration : AttackFallbackDuration;
 		_phaseTimer = len > 0.05f ? len : fallback;
 
@@ -216,7 +224,11 @@ public partial class PlayerAttack : Node
 		}
 
 		float t = AnimDriver.GetCurrentPosition() / len;
-		bool show = t >= HeavyTelegraphNormStart && t < AnimDriver.HeavyAttackHitNormStart;
+		AnimDriver.GetAttackHitWindow(out float firstHit, out _);
+		float telegraphFrom = AnimDriver.HeavyHitWindows is { Length: > 0 }
+			? 0.06f
+			: HeavyTelegraphNormStart;
+		bool show = t >= telegraphFrom && t < firstHit;
 		if (show)
 		{
 			ShowHeavyTelegraph();

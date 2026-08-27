@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import bpy
+from mathutils import Matrix
 
 
 CLIP_MAPS = {
@@ -46,7 +47,8 @@ CLIP_MAPS = {
 		"great sword walk.fbx": "walk",
 		"great sword run.fbx": "run",
 		"great sword slash.fbx": "attack",
-		"great sword high spin attack.fbx": "attack_heavy",
+		"great sword slash (2).fbx": "attack_heavy",
+		"great sword high spin attack.fbx": "attack_spin",
 		"great sword impact.fbx": "stagger",
 		"two handed sword death.fbx": "death",
 	},
@@ -68,9 +70,67 @@ CLIP_MAPS = {
 		"Falling Back Death.fbx": "death_alt",
 		"Flying Back Death.fbx": "death_flyback",
 	},
+	# Calm unarmed (sheathed, default). Paths relative to Mixamo/Player/Unarmed/Action Adventure Pack/.
+	"unarmed_calm": {
+		"idle.fbx": "calm_idle",
+		"walking.fbx": "calm_walk",
+		"running.fbx": "calm_run",
+	},
+	# Unarmed combat (after a punch, until 5s idle). Paths relative to Mixamo/Player/Unarmed/Combat/.
+	"unarmed_combat": {
+		"Idle.fbx": "unarmed_idle",
+		"Punching.fbx": "unarmed_attack",
+		"Cross Punch.fbx": "unarmed_attack_alt",
+		"Roundhouse Kick.fbx": "unarmed_attack_heavy",
+		"Medium Hit To Head.fbx": "unarmed_stagger",
+	},
+	# 1H: unshielded Mixamo clips + Sword+Shield locomotion/idle.
+	"one_hand_sword": {
+		"Sword and Shield Pack/sword and shield idle.fbx": "1h_idle",
+		"Sword and Shield Pack/sword and shield walk.fbx": "1h_walk",
+		"Run With Sword.fbx": "1h_run",
+		"Stable Sword Outward Slash.fbx": "1h_attack",
+		"Stable Sword Inward Slash.fbx": "1h_attack_alt",
+		"One Hand Sword Combo.fbx": "1h_attack_heavy",
+		"Sword and Shield Pack/sword and shield impact.fbx": "1h_stagger",
+		"Withdrawing Sword.fbx": "1h_draw",
+		"Sheathing Sword.fbx": "1h_sheathe",
+	},
+	# Knife / club extras (optional; not in default BloodKnight rebuild).
+	"knife": {
+		"Knife Idle.fbx": "knife_idle",
+		"Upward Thrust.fbx": "knife_attack",
+		"One Hand Club Combo.fbx": "knife_combo",
+	},
+	# Great Sword Pack draw / sheathe.
+	"great_sword_draw": {
+		"draw a great sword 1.fbx": "2h_draw",
+		"draw a great sword 2.fbx": "2h_draw_alt",
+		"Sheath A Great Sword 1.fbx": "2h_sheathe",
+		"Sheath A Great Sword 2.fbx": "2h_sheathe_alt",
+	},
+	"player_roll": {
+		"Roll.fbx": "roll",
+	},
 }
 
-LOOP_CLIPS = {"idle", "idle_2", "idle_3", "idle_4", "idle_5", "walk", "run"}
+LOOP_CLIPS = {
+	"idle",
+	"idle_2",
+	"idle_3",
+	"idle_4",
+	"idle_5",
+	"walk",
+	"run",
+	"calm_idle",
+	"calm_walk",
+	"calm_run",
+	"unarmed_idle",
+	"1h_idle",
+	"1h_walk",
+	"1h_run",
+	"knife_idle",
+}
 # Death needs hips translation so the body settles on the floor.
 KEEP_HIPS_LOCATION_CLIPS = {
 	"mutant": {"death", "death_alt", "death_dying", "death_flyback"},
@@ -78,13 +138,79 @@ KEEP_HIPS_LOCATION_CLIPS = {
 	"blood_knight": {"death", "death_alt", "death_dying", "death_flyback"},
 	"bandit": {"death", "death_alt", "death_flyback"},
 	"mixamo_deaths": {"death_alt", "death_dying", "death_flyback"},
+	"unarmed_calm": set(),
+	"unarmed_combat": set(),
+	"one_hand_sword": set(),
+	"knife": set(),
+	"great_sword_draw": set(),
+	"player_roll": set(),
 }
 HIPS_NAMES = {
 	"mixamorig:Hips",
 	"mixamorig5:Hips",
 	"Hips",
+	"hips",
 	"mixamorig_Hips",
 }
+
+# Newer Mixamo FBX (Idle.fbx / Sword+Shield / Knife) use short names (L_arm, hips)
+# instead of mixamorig:LeftArm. Map Mixamo leaf -> donor bone.
+_SIMPLE_CORE = {
+	"Hips": "hips",
+	"Spine": "spine",
+	"Spine1": "chest",
+	# Spine2 has no counterpart on short Mixamo rigs (hips/spine/chest).
+	# Mapping it to chest folded the torso (DCP pose).
+	"Neck": "neck",
+	"Head": "head",
+	"HeadTop_End": "top",
+}
+_SIMPLE_LIMB = {
+	"Shoulder": "shoulder",
+	"Arm": "arm",
+	"ForeArm": "elbow",
+	"Hand": "wrist",
+	"UpLeg": "leg",
+	"Leg": "knee",
+	"Foot": "ankle",
+	"ToeBase": "foot",
+	"Toe_End": "toes",
+}
+_SIMPLE_FINGER = {
+	"HandIndex": "point",
+	"HandMiddle": "middle",
+	"HandRing": "ring",
+	"HandPinky": "pink",
+	"HandThumb": "thumb",
+}
+
+
+def mixamo_leaf_to_simple(leaf: str) -> str | None:
+	if leaf in _SIMPLE_CORE:
+		return _SIMPLE_CORE[leaf]
+	for prefix, side in (("Left", "L"), ("Right", "R")):
+		if not leaf.startswith(prefix):
+			continue
+		rest = leaf[len(prefix) :]
+		if rest in _SIMPLE_LIMB:
+			return f"{side}_{_SIMPLE_LIMB[rest]}"
+		for mix_finger, simple in _SIMPLE_FINGER.items():
+			if rest.startswith(mix_finger):
+				idx = rest[len(mix_finger) :]
+				return f"{side}_{simple}{idx}"
+	return None
+
+
+def retarget_src_bone_name(dst_bone: str, src_pose_bones) -> str | None:
+	if dst_bone in src_pose_bones:
+		return dst_bone
+	leaf = dst_bone.split(":")[-1]
+	if leaf in src_pose_bones:
+		return leaf
+	simple = mixamo_leaf_to_simple(leaf)
+	if simple and simple in src_pose_bones:
+		return simple
+	return None
 
 
 def clear_scene() -> None:
@@ -561,6 +687,153 @@ def strip_non_hips_locations(action: bpy.types.Action) -> int:
 	return removed
 
 
+def is_foreign_mixamo_rig(src_arm: bpy.types.Object) -> bool:
+	names = {b.name for b in src_arm.data.bones}
+	if any(n.startswith("mixamorig") for n in names):
+		return False
+	return "L_arm" in names or "hips" in names
+
+
+def iter_bones_parent_first(arm: bpy.types.Object):
+	def walk(bone):
+		yield bone
+		for child in bone.children:
+			yield from walk(child)
+
+	for bone in arm.data.bones:
+		if bone.parent is None:
+			yield from walk(bone)
+
+
+def _axes_to_matrix(x, y, z):
+	return Matrix(
+		(
+			(x.x, y.x, z.x),
+			(x.y, y.y, z.y),
+			(x.z, y.z, z.z),
+		)
+	)
+
+
+def retarget_aim_y(
+	src_arm: bpy.types.Object,
+	dst_arm: bpy.types.Object,
+	src_action: bpy.types.Action,
+	clip_name: str,
+	axis_euler,
+	copy_hips_location: bool = False,
+) -> bpy.types.Action:
+	"""
+	Aim each dest bone +Y at the mapped source bone +Y, keeping dest roll.
+	Needed for Mixamo's short rig (L_arm): rest X is ~180° from mixamorig, so
+	WORLD copy-rotation twists the mesh; local copy keeps T-pose instead of the clip.
+	"""
+	from mathutils import Matrix, Vector
+
+	src_arm.location = (0.0, 0.0, 0.0)
+	dst_arm.location = (0.0, 0.0, 0.0)
+	src_arm.rotation_euler = axis_euler.copy()
+	dst_arm.rotation_euler = axis_euler.copy()
+	bpy.context.view_layer.update()
+
+	bind_action(src_arm, src_action)
+
+	src_map: dict[str, str] = {}
+	for b in dst_arm.data.bones:
+		src_name = retarget_src_bone_name(b.name, src_arm.pose.bones)
+		if src_name:
+			src_map[b.name] = src_name
+	unmapped = [b.name for b in dst_arm.data.bones if b.name not in src_map]
+	if unmapped:
+		print(f"RETARGET {clip_name} aim-y unmapped={unmapped}")
+
+	for old in list(bpy.data.actions):
+		if sanitize_action_name(old.name) == clip_name and old != src_action:
+			bpy.data.actions.remove(old)
+
+	dst_act = bpy.data.actions.new(clip_name)
+	if dst_arm.animation_data is None:
+		dst_arm.animation_data_create()
+	dst_arm.animation_data.action = None
+	bind_action(dst_arm, dst_act)
+
+	for pb in dst_arm.pose.bones:
+		pb.rotation_mode = "QUATERNION"
+		pb.matrix_basis.identity()
+
+	f0 = int(round(src_action.frame_range[0]))
+	f1 = int(round(src_action.frame_range[1]))
+	if f1 <= f0:
+		f1 = f0 + 1
+
+	scene = bpy.context.scene
+	y_axis = Vector((0.0, 1.0, 0.0))
+	x_axis = Vector((1.0, 0.0, 0.0))
+	for frame in range(f0, f1 + 1):
+		scene.frame_set(frame)
+		bpy.context.view_layer.update()
+		for bone in iter_bones_parent_first(dst_arm):
+			dst_name = bone.name
+			src_name = src_map.get(dst_name)
+			if not src_name:
+				continue
+			dst_pb = dst_arm.pose.bones[dst_name]
+			src_pb = src_arm.pose.bones[src_name]
+			src_world = src_arm.matrix_world @ src_pb.matrix.to_4x4()
+			src_y_world = (src_world.to_3x3() @ y_axis).normalized()
+			if dst_pb.parent:
+				parent_world = (dst_arm.matrix_world @ dst_pb.parent.matrix.to_4x4()).to_3x3()
+			else:
+				parent_world = dst_arm.matrix_world.to_3x3()
+			src_y_parent = (parent_world.inverted() @ src_y_world).normalized()
+			rest_local = dst_pb.bone.matrix_local.to_4x4()
+			rest_3 = rest_local.to_3x3()
+			rest_y = (rest_3 @ y_axis).normalized()
+			rest_x = (rest_3 @ x_axis).normalized()
+			rot = rest_y.rotation_difference(src_y_parent)
+			x = (rot @ rest_x).normalized()
+			y = src_y_parent
+			z = y.cross(x)
+			if z.length < 1e-6:
+				z = Vector((0.0, 0.0, 1.0))
+			z.normalize()
+			x = z.cross(y).normalized()
+			posed_local = _axes_to_matrix(x, y, z).to_4x4()
+			posed_local.translation = rest_local.translation
+			if dst_pb.parent:
+				desired = dst_pb.parent.matrix.to_4x4() @ posed_local
+			else:
+				desired = posed_local
+			dst_pb.matrix = desired
+			is_hips = (
+				dst_name in HIPS_NAMES
+				or dst_name.endswith(":Hips")
+				or dst_name.endswith(":hips")
+				or dst_name in {"Hips", "hips"}
+			)
+			if copy_hips_location and is_hips:
+				dst_pb.location = src_pb.location.copy()
+		bpy.context.view_layer.update()
+		for dst_name in src_map:
+			pb = dst_arm.pose.bones[dst_name]
+			pb.keyframe_insert(data_path="rotation_quaternion", frame=frame)
+			is_hips = (
+				dst_name in HIPS_NAMES
+				or dst_name.endswith(":Hips")
+				or dst_name.endswith(":hips")
+				or dst_name in {"Hips", "hips"}
+			)
+			if copy_hips_location and is_hips:
+				pb.keyframe_insert(data_path="location", frame=frame)
+
+	dst_arm.animation_data.action = None
+	print(
+		f"RETARGET {clip_name}: mode=aim-y bones={len(src_map)} frames={f0}-{f1} "
+		f"hips_loc={copy_hips_location}"
+	)
+	return dst_act
+
+
 def retarget_world_rotations(
 	src_arm: bpy.types.Object,
 	dst_arm: bpy.types.Object,
@@ -592,23 +865,32 @@ def retarget_world_rotations(
 			if c.name.startswith("RT_"):
 				pb.constraints.remove(c)
 
-	bones = [b.name for b in dst_arm.data.bones if b.name in src_arm.pose.bones]
+	src_map: dict[str, str] = {}
+	for b in dst_arm.data.bones:
+		src_name = retarget_src_bone_name(b.name, src_arm.pose.bones)
+		if src_name:
+			src_map[b.name] = src_name
+	bones = list(src_map.keys())
+	unmapped = [b.name for b in dst_arm.data.bones if b.name not in src_map]
+	if unmapped:
+		print(f"RETARGET {clip_name} unmapped={unmapped}")
 	for name in bones:
 		pb = dst_arm.pose.bones[name]
+		src_name = src_map[name]
 		c = pb.constraints.new("COPY_ROTATION")
 		c.name = "RT_ROT"
 		c.target = src_arm
-		c.subtarget = name
+		c.subtarget = src_name
 		c.target_space = "WORLD"
 		c.owner_space = "WORLD"
 		c.mix_mode = "REPLACE"
 		# Death / fall clips need hips translation so the body settles on the floor.
-		is_hips = name in HIPS_NAMES or name.endswith(":Hips") or name == "Hips"
+		is_hips = name in HIPS_NAMES or name.endswith(":Hips") or name.endswith(":hips") or name in {"Hips", "hips"}
 		if copy_hips_location and is_hips:
 			cl = pb.constraints.new("COPY_LOCATION")
 			cl.name = "RT_LOC"
 			cl.target = src_arm
-			cl.subtarget = name
+			cl.subtarget = src_name
 			cl.target_space = "WORLD"
 			cl.owner_space = "WORLD"
 			cl.use_offset = False
@@ -699,6 +981,7 @@ def import_clip_map(
 		before_objs = set(bpy.data.objects)
 		import_file(path)
 		new_actions = [a for a in bpy.data.actions if a not in before_actions]
+		new_actions.sort(key=lambda a: float(a.frame_range[1] - a.frame_range[0]))
 		new_arms = [o for o in bpy.data.objects if o not in before_objs and o.type == "ARMATURE"]
 		if not new_actions:
 			print(f"WARN: no action in {path.name}")
@@ -711,19 +994,31 @@ def import_clip_map(
 			remove_nla_track_named(base_arm, clip_name)
 
 			src_arm = new_arms[0] if new_arms else None
+			if new_arms and src_action is not None:
+				for arm in new_arms:
+					if arm.animation_data and arm.animation_data.action == src_action:
+						src_arm = arm
+						break
 			keep_hips = KEEP_HIPS_LOCATION_CLIPS.get(preset, {"death", "death_alt", "death_flyback"})
+			skipped = False
 			if retarget and src_arm is not None and src_arm != base_arm:
-				action = retarget_world_rotations(
-					src_arm,
-					base_arm,
-					src_action,
-					clip_name,
-					axis_euler=axis_euler,
-					copy_hips_location=(clip in keep_hips),
-				)
-				# Drop the donor action — keys live on the baked clip now.
-				if src_action and src_action.name in bpy.data.actions:
-					bpy.data.actions.remove(src_action)
+				if is_foreign_mixamo_rig(src_arm):
+					print(
+						f"SKIP {path.name}: Mixamo short rig (hips/L_arm), not mixamorig. "
+						"Re-download this clip onto Blood Knight in Mixamo."
+					)
+					skipped = True
+				else:
+					action = retarget_world_rotations(
+						src_arm,
+						base_arm,
+						src_action,
+						clip_name,
+						axis_euler=axis_euler,
+						copy_hips_location=(clip in keep_hips),
+					)
+					if src_action and src_action.name in bpy.data.actions:
+						bpy.data.actions.remove(src_action)
 			else:
 				action = src_action
 				action.name = clip_name
@@ -732,20 +1027,21 @@ def import_clip_map(
 				if remapped:
 					print(f"REMAP {clip_name}: {remapped} fcurves -> {target_prefix}")
 
-			strip_hips = strip_root_motion and clip not in keep_hips
-			sanitized[action.name] = sanitize_action_tracks(
-				action, rotations_only=rotations_only, strip_root_motion=strip_hips
-			)
-			if clip in keep_hips:
-				scaled = scale_hips_location_cm_to_m(action)
-				sanitized[action.name]["hips_cm_scale"] = scaled
-				if scaled.get("scaled"):
-					print(f"SCALE_HIPS {clip_name}: max_abs={scaled['max_abs']:.1f} -> x{scaled['factor']}")
-			if clip in LOOP_CLIPS:
-				mark_loop(action)
-			coverage[action.name] = action_bone_coverage(action, base_arm)
-			push_action_to_nla(base_arm, action, action.name)
-			added.append(action.name)
+			if not skipped:
+				strip_hips = strip_root_motion and clip not in keep_hips
+				sanitized[action.name] = sanitize_action_tracks(
+					action, rotations_only=rotations_only, strip_root_motion=strip_hips
+				)
+				if clip in keep_hips:
+					scaled = scale_hips_location_cm_to_m(action)
+					sanitized[action.name]["hips_cm_scale"] = scaled
+					if scaled.get("scaled"):
+						print(f"SCALE_HIPS {clip_name}: max_abs={scaled['max_abs']:.1f} -> x{scaled['factor']}")
+				if clip in LOOP_CLIPS:
+					mark_loop(action)
+				coverage[action.name] = action_bone_coverage(action, base_arm)
+				push_action_to_nla(base_arm, action, action.name)
+				added.append(action.name)
 
 		new_objs = [o for o in bpy.data.objects if o.name not in keep_names]
 		remove_objects(new_objs)
@@ -766,6 +1062,7 @@ def merge(
 	extra_anims_dir: Path | None = None,
 	extra_preset: str | None = None,
 	retarget: bool = True,
+	extra_passes: list[tuple[Path, str]] | None = None,
 ) -> dict:
 	if not CLIP_MAPS.get(preset):
 		raise RuntimeError(f"Unknown preset '{preset}'. Known: {sorted(CLIP_MAPS)}")
@@ -773,6 +1070,14 @@ def merge(
 		raise RuntimeError(f"Unknown extra preset '{extra_preset}'. Known: {sorted(CLIP_MAPS)}")
 	if extra_preset and extra_anims_dir is None:
 		raise RuntimeError("--extra-preset requires --extra-anims-dir")
+	passes: list[tuple[Path, str]] = list(extra_passes or [])
+	if extra_preset and extra_anims_dir is not None:
+		passes.insert(0, (extra_anims_dir, extra_preset))
+	for extra_dir, extra_name in passes:
+		if not CLIP_MAPS.get(extra_name):
+			raise RuntimeError(f"Unknown extra preset '{extra_name}'. Known: {sorted(CLIP_MAPS)}")
+		if extra_dir is None:
+			raise RuntimeError(f"--extra requires a directory for preset '{extra_name}'")
 
 	clear_scene()
 	import_file(base)
@@ -807,10 +1112,10 @@ def merge(
 		retarget=retarget,
 		axis_euler=axis_euler,
 	)
-	if extra_preset and extra_anims_dir is not None:
+	for extra_dir, extra_name in passes:
 		keep_names = import_clip_map(
-			anims_dir=extra_anims_dir,
-			preset=extra_preset,
+			anims_dir=extra_dir,
+			preset=extra_name,
 			base_arm=base_arm,
 			keep_names=keep_names,
 			rotations_only=rotations_only,
@@ -824,6 +1129,10 @@ def merge(
 
 	# Restore hero armature axis before export (retarget may have touched it).
 	base_arm.rotation_euler = axis_euler
+	if base_arm.animation_data:
+		base_arm.animation_data.action = None
+	for pb in base_arm.pose.bones:
+		pb.matrix_basis.identity()
 	bpy.context.view_layer.update()
 
 	cleanup_scene_graph(base_arm)
@@ -915,6 +1224,13 @@ def main(argv: list[str]) -> int:
 		choices=[""] + sorted(CLIP_MAPS.keys()),
 		help="Preset for --extra-anims-dir.",
 	)
+	parser.add_argument(
+		"--extra",
+		action="append",
+		default=[],
+		metavar="DIR::PRESET",
+		help="Additional anim folder + preset (repeatable). Example: Mixamo/Player/Unarmed::unarmed",
+	)
 	parser.add_argument("--preset", default="mutant", choices=sorted(CLIP_MAPS.keys()))
 	parser.add_argument(
 		"--no-retarget",
@@ -925,6 +1241,12 @@ def main(argv: list[str]) -> int:
 	textures = Path(args.textures_dir) if args.textures_dir else None
 	extra_dir = Path(args.extra_anims_dir) if args.extra_anims_dir else None
 	extra_preset = args.extra_preset or None
+	extra_passes: list[tuple[Path, str]] = []
+	for spec in args.extra:
+		if "::" not in spec:
+			raise RuntimeError(f"--extra expects DIR::PRESET, got: {spec}")
+		raw_dir, raw_preset = spec.rsplit("::", 1)
+		extra_passes.append((Path(raw_dir), raw_preset))
 	merge(
 		Path(args.base),
 		Path(args.anims_dir),
@@ -938,6 +1260,7 @@ def main(argv: list[str]) -> int:
 		extra_dir,
 		extra_preset,
 		retarget=not args.no_retarget,
+		extra_passes=extra_passes,
 	)
 	return 0
 

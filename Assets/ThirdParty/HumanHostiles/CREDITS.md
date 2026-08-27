@@ -21,8 +21,8 @@ blender --factory-startup --background --python Tools/merge_mixamo_anims.py -- \
 ```
 
 ## Cursed Knight
-- **Raw:** Sketchfab / pack *Brother Knight* — custom Unreal-style skeleton (`spine_*_jnt`, etc.), **not** Mixamo. No combat animation set usable with our `EnemyAnimDriver` clips.
-- **Processed/CursedKnight_BrotherMesh.glb:** mesh+textures reference export (no gameplay anims).
-- **Slice stand-in:** `Scenes/Enemy/CursedKnight.tscn` currently instances `BloodKnight.glb` with a cursed ash tint until Brother Knight is Mixamo Auto-Rigged + animation pack merged (same workflow as Blood Knight CREDITS).
+- **Raw:** Sketchfab / pack *Brother Knight* — custom Unreal-style skeleton, **not** Mixamo. No combat animation set usable with `EnemyAnimDriver`.
+- **Slice stand-in:** `Scenes/Enemy/CursedKnight.tscn` instances `BloodKnight.glb` with a cursed ash tint until Brother Knight is Mixamo Auto-Rigged + animation pack merged.
+- Reference Brother mesh export was removed in Aug 2026 cleanup (unused).
 
 When Mixamo-ready FBX + clips (`idle` / `walk|run` / `attack` / `stagger` / `death`) are available, merge into `Processed/CursedKnight.glb` and point the scene at it.
