@@ -7,19 +7,23 @@ SRC="$BASE/Source"
 PROC="$BASE/Processed"
 mkdir -p "$PROC"
 
-echo "== AltarRuins =="
-rm -rf "$PROC/AltarRuins" "$PROC/_tmp_altar"
-mkdir -p "$PROC/AltarRuins"
-unzip -o -q "$SRC/altar-ruins/source/Unity2Skfb.zip" -d "$PROC/_tmp_altar"
-mv "$PROC/_tmp_altar/Unity2Skfb.gltf" "$PROC/AltarRuins/AltarRuins.gltf"
-mv "$PROC/_tmp_altar/Unity2Skfb.bin" "$PROC/AltarRuins/AltarRuins.bin"
-mv "$PROC/_tmp_altar/Assets" "$PROC/AltarRuins/Assets"
-python3 - <<PY
+echo "== AltarRuins (optional; Source removed in Aug 2026 cleanup) =="
+if [[ -f "$SRC/altar-ruins/source/Unity2Skfb.zip" ]]; then
+  rm -rf "$PROC/AltarRuins" "$PROC/_tmp_altar"
+  mkdir -p "$PROC/AltarRuins"
+  unzip -o -q "$SRC/altar-ruins/source/Unity2Skfb.zip" -d "$PROC/_tmp_altar"
+  mv "$PROC/_tmp_altar/Unity2Skfb.gltf" "$PROC/AltarRuins/AltarRuins.gltf"
+  mv "$PROC/_tmp_altar/Unity2Skfb.bin" "$PROC/AltarRuins/AltarRuins.bin"
+  mv "$PROC/_tmp_altar/Assets" "$PROC/AltarRuins/Assets"
+  python3 - <<PY
 from pathlib import Path
 p = Path("$PROC/AltarRuins/AltarRuins.gltf")
 p.write_text(p.read_text().replace("Unity2Skfb.bin", "AltarRuins.bin"))
 PY
-rm -rf "$PROC/_tmp_altar"
+  rm -rf "$PROC/_tmp_altar"
+else
+  echo "SKIP: altar-ruins Source not present"
+fi
 
 echo "== ModularDungeon =="
 rm -rf "$PROC/ModularDungeon"
@@ -27,11 +31,15 @@ mkdir -p "$PROC/ModularDungeon/textures"
 cp "$SRC/free-modular-dungeon-assets/source/Dungeon assets.fbx" "$PROC/ModularDungeon/ModularDungeon.fbx"
 cp -R "$SRC/free-modular-dungeon-assets/textures/"* "$PROC/ModularDungeon/textures/"
 
-echo "== AngelStatues =="
-rm -rf "$PROC/AngelStatues"
-mkdir -p "$PROC/AngelStatues/textures"
-cp "$SRC/free-angels-statues-retopoed-kinda/source/Angels.fbx" "$PROC/AngelStatues/Angels.fbx"
-cp "$SRC/free-angels-statues-retopoed-kinda/textures/"Angels_*.png "$PROC/AngelStatues/textures/"
+echo "== AngelStatues (optional; Source removed in Aug 2026 cleanup) =="
+if [[ -f "$SRC/free-angels-statues-retopoed-kinda/source/Angels.fbx" ]]; then
+  rm -rf "$PROC/AngelStatues"
+  mkdir -p "$PROC/AngelStatues/textures"
+  cp "$SRC/free-angels-statues-retopoed-kinda/source/Angels.fbx" "$PROC/AngelStatues/Angels.fbx"
+  cp "$SRC/free-angels-statues-retopoed-kinda/textures/"Angels_*.png "$PROC/AngelStatues/textures/"
+else
+  echo "SKIP: free-angels Source not present"
+fi
 
 echo "== GreekPillar =="
 rm -rf "$PROC/GreekPillar" "$PROC/_tmp_pillar"

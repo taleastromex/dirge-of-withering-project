@@ -222,6 +222,16 @@ public partial class BasicEnemy : CharacterBody3D
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
 		RetargetCombatTarget();
 		CallDeferred(MethodName.EnterIdle);
+		CallDeferred(nameof(HaltIfPlayerGripTune));
+	}
+
+	private void HaltIfPlayerGripTune()
+	{
+		if (GetTree()?.GetFirstNodeInGroup("player") is Node player
+			&& player.GetNodeOrNull<PlayerWeaponAttach>("WeaponAttach") is { GripTuneMode: true })
+		{
+			HaltForAuthoring();
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -392,6 +402,17 @@ public partial class BasicEnemy : CharacterBody3D
 
 		_knockbackVelocity = dir.Normalized() * force;
 		_knockbackTimer = KnockbackDuration;
+	}
+
+	public void HaltForAuthoring()
+	{
+		AiEnabled = false;
+		if (_state == AiState.Dead)
+		{
+			return;
+		}
+
+		EnterIdle();
 	}
 
 	private void EnterIdle()

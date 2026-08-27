@@ -11,12 +11,20 @@ Inventory later: swap `WeaponEquipData` through `WeaponAttach3D.Equip(...)`.
 
 ## Zweihander
 - **File:** `zweihander.glb`
-- **Role:** Blood Knight / Cursed Knight (still legacy grip on `WeaponAttach3D` / `PlayerWeaponAttach` until socket-baked)
-- **Note:** Copied from `CathedralSlice/Source/` (`.gdignored`).
+- **Role:** Blood Knight / Cursed Knight (legacy grip on `PlayerWeaponAttach` / GripTune)
 - **License:** as specified by the asset source (verify before commercial release)
 
 ## One-handed axe
-- **Raw:** `Assets/ThirdParty/CathedralSlice/Source/one-handed-axe/source/Little_Axe.obj` + `textures/`
+- **Raw:** `Assets/ThirdParty/CathedralSlice/Source/one-handed-axe/`
 - **Processed:** `one-handed-axe/Processed/BanditAxe.glb` — handle along +X, grip at origin (~0.85 m)
-- **Equip def:** `res://Assets/Combat/Weapons/BanditAxe_Equip.tres` (legacy grip offsets until a correct socket bake)
+- **Equip def:** `res://Assets/Combat/Weapons/BanditAxe_Equip.tres`
 - **License:** as specified by the asset source (verify before commercial release)
+
+## One-handed sword
+- **Raw:** `CathedralSlice/Source/sword-one-handed-01/`
+- **Processed:** `one-handed-sword/Processed/OneHandedSword.glb`
+- **Equip def:** `res://Assets/Combat/Weapons/OneHandedSword_Equip.tres`
+- **Anims:** Mixamo → BloodKnight clips `1h_*`
+
+## Removed (Aug 2026 cleanup)
+Katana / Norman sword Processed + Source packs — not in PlayerLoadout; deleted to save space. Re-download from Sketchfab if needed later.

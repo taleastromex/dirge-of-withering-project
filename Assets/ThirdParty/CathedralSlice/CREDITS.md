@@ -10,63 +10,35 @@
 
 ### Free Modular Dungeon Assets
 - **Role:** пол, стены, апсида (`ApseAltar` / `ApseRuin_*` / `ApsePillar_*`), choke-завалы (`RubbleArt_*` из Cliff/Stone cube)
-- **Sketchfab slug:** `free-modular-dungeon-assets` (поиск по имени на Sketchfab)
-- **License:** как указано на странице модели (обычно CC Attribution / CC0 — сверить при обновлении)
+- **Sketchfab slug:** `free-modular-dungeon-assets`
 - **Source folder:** `Source/free-modular-dungeon-assets/`
 
 ### Altar for Diana
 - **Role:** алтарь в апсиде (`ApseAltar`)
-- **Sketchfab slug:** `altar-for-diana` (или имя на странице модели)
-- **License:** как указано на странице модели
+- **Sketchfab slug:** `altar-for-diana`
 - **Source folder:** `Source/altar-for-diana/`
 
-### Altar Ruins
-- **Role:** скачан, **не используется** в срезе (меш креста с парящим мусором от платформы)
-- **Sketchfab slug:** `altar-ruins`
-- **License:** как указано на странице модели (Free / Attribution — сверить)
-- **Source folder:** `Source/altar-ruins/`
-
-### Free Angels Statues (retopoed)
-- **Role:** скачан, но не используется в срезе (меш-группа сплющивается в слоте Gate)
-- **Sketchfab slug:** `free-angels-statues-retopoed-kinda`
-- **License:** как указано на странице модели
-- **Source folder:** `Source/free-angels-statues-retopoed-kinda/`
-
 ### Greek Pillar
-- **Role:** 4 колонны по периметру нефа (`PerimeterColumn_A`–`D`, места PillarA–D)
+- **Role:** 4 колонны по периметру нефа (`PerimeterColumn_A`–`D`)
 - **Sketchfab slug:** `greek-pillar`
-- **License:** как указано на странице модели
 - **Source folder:** `Source/greek-pillar/` (в Processed конвертируется assimp → `.glb`)
 
 ### Broken and Overgrown Cemetery Figure
 - **Role:** статуи у обоих пилонов входа (`PerimeterStatue_GateL` / `GateR`)
 - **Sketchfab slug:** `broken-and-overgrown-cemetery-figure`
-- **License:** как указано на странице модели
 - **Source folder:** `Source/broken-and-overgrown-cemetery-figure/`
 
 ### Lantern (flashlight kit)
 - **Role:** practicals у источников света (`HangingLantern_Mid` / `_Apse` / `_Altar`)
 - **Source folder:** `Source/lantern/` (`SM_Flashlight.fbx`)
-- **License:** как указано на странице модели
 
-### Zweihander (player prop)
-- **Role:** visible greatsword on Blood Knight right hand (`PlayerWeaponAttach`)
-- **File:** `Source/zweihander.glb`
-- **License:** as specified by the asset source (verify before commercial release)
+### Player / weapons rebuild inputs (also under Source/)
+- `knight-of-the-blood-order/`, `Great Sword Pack/`, `Mixamo/Player/`, `HumanHostiles/Bandit/`, `one-handed-axe/`, `sword-one-handed-01/`
+- In-game zweihander: `Assets/ThirdParty/Weapons/zweihander.glb`
 
-## Скачано, но не вошло в финальный GLB
+## Удалено из Source (Aug 2026 cleanup)
 
-Оставлены в `Source/` на будущее / отбракованы по стилю, весу или масштабу:
+Неиспользуемые / отбракованные паки убраны локально, чтобы не занимать диск:  
+`altar-ruins`, `free-angels-statues-retopoed-kinda`, `katana`, `2-handed-norman-sword`, armor packs, `death-samurai`, `cultist-tpose`, `dark-scene-diorama`, `energy-archway`, `concrete-wall`, `cloitre-puy-en-velay`, `ancient-stone-gate-ruin-moss-covered`, rubble GLB, дубли death FBX в корне `HumanHostiles/`.
 
-| Folder | Причина |
-|--------|---------|
-| `ancient-stone-gate-ruin-moss-covered` | ~960k verts (Tripo), слишком тяжело для среза |
-| `dark-scene-diorama` | слишком мелкая/шумная сцена, не модульная |
-| `greek-pillar` | DAE/текстуры; колонны взяты из dungeon pack |
-| `two_piles_of_construction_rubble.glb` | ~42 MB |
-| `energy-archway` | sci-fi вид |
-| `concrete-wall` | современный бетон |
-| `cloitre-puy-en-velay` | тяжёлый скан |
-| `broken-and-overgrown-cemetery-figure` | тяжёлые 4K текстуры |
-
-При коммерческом релизе перепроверь лицензии каждой модели на Sketchfab и дополни атрибуцию здесь точными URL/авторами.
+При коммерческом релизе перепроверь лицензии моделей на Sketchfab.

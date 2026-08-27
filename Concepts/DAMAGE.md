@@ -67,6 +67,20 @@ taken       = taken_phys + taken_ichor
 
 Срез NPC (карточки): Ash Walker **160 / 40 / 25%**, Ichor Beast **250 / 60 / 35%**.
 
+### Loadout (этап 4.3)
+
+`N` и `PhysicalResist` игрока берутся из экипа, не из констант сцены.
+
+| Источник | `N` | Вес | Resist |
+|----------|----:|----:|-------:|
+| Ножны / рукопашка | 14 | — | с брони |
+| Zweihander (drawn) | 40 | 8 | — |
+| Bandit Axe | 28 | 4 | — |
+| Arming Sword | 32 | 5 | — |
+| Cursed Knight Plate | — | 10 | 20% |
+
+Cap веса **20**. Смена слота, которая превысит cap, блокируется (`Too heavy` в HUD). В ножнах бьёт `unarmed_*`; **R** достаёт/убирает.
+
 ### Soft-cap FILTH от Высвобождения
 
 ```text

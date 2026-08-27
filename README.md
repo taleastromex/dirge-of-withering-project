@@ -189,7 +189,7 @@ Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 | 3.4 | Docs / playtest DoD ребаланса | Готово |
 | **4.1 Combat feel** | Hurt + interrupt атак; 3D SFX врагов (шаги / телеграф / смерть) | Готово |
 | **4.2 Enemy taxonomy** | Категории Distorted/Human/Undead; Bandit + Cursed Knight; NPC↔NPC | Готово |
-| 4.3 Loadout | Мин. инвентарь: 2 оружия или оружие+доспех, статы, UI слотов | Далее |
+| 4.3 Loadout | Оружие+доспех, вес, draw/sheathe (R), Calm/Combat, рукопашка в ножнах, HUD N/resist/вес | Готово |
 | 4.4 World expand | Вторая зона / крыло; переход; повтор алтаря/луж | Далее |
 | 4.5 NPC / RPG | 1 нейтрал + диалог/квест-заглушка; Filth Level vs боевой FILTH | Далее |
 | 4.6 Free camera | Орбита мышью; отдельный control-pass | Далее |

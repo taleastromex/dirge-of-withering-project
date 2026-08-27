@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Player/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://Scripts/Combat/Health.cs" id="2_health"]
@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" path="res://Assets/ThirdParty/BloodKnight/Processed/BloodKnight.glb" id="8_model"]
 [ext_resource type="Script" path="res://Scripts/Player/PlayerWeaponAttach.cs" id="9_weapon"]
 [ext_resource type="Script" path="res://Scripts/Player/PlayerFilthAura.cs" id="10_filth_aura"]
+[ext_resource type="Script" path="res://Scripts/Player/PlayerLoadout.cs" id="11_loadout"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.35
@@ -63,7 +64,7 @@ Health = NodePath("../Health")
 BlightController = NodePath("../BlightController")
 AnimDriver = NodePath("../AnimDriver")
 AttackFallbackDuration = 1.3
-HeavyAttackFallbackDuration = 2.0
+HeavyAttackFallbackDuration = 4.0
 RecoveryTime = 0.12
 HeavyRecoveryTime = 0.18
 HeavyTelegraphNormStart = 0.45
@@ -87,8 +88,8 @@ WalkReferenceSpeed = 1.35
 RunReferenceSpeed = 4.0
 AttackHitNormStart = 0.38
 AttackHitNormEnd = 0.58
-HeavyAttackHitNormStart = 0.58
-HeavyAttackHitNormEnd = 0.78
+HeavyAttackHitNormStart = 0.18
+HeavyAttackHitNormEnd = 0.82
 
 [node name="WeaponAttach" type="Node" parent="." node_paths=PackedStringArray("AnimDriver")]
 script = ExtResource("9_weapon")
@@ -106,6 +107,15 @@ StrikeBlendInNorm = 0.1
 StrikeBlendOutNorm = 0.14
 AnimDriver = NodePath("../AnimDriver")
 GripTuneMode = false
+
+[node name="Loadout" type="Node" parent="." node_paths=PackedStringArray("WeaponAttach", "AnimDriver", "Attack", "Health")]
+script = ExtResource("11_loadout")
+MaxCarryWeight = 20.0
+UnarmedDamageN = 14
+WeaponAttach = NodePath("../WeaponAttach")
+AnimDriver = NodePath("../AnimDriver")
+Attack = NodePath("../PlayerAttack")
+Health = NodePath("../Health")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
